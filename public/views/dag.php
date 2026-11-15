@@ -4,6 +4,12 @@
  */
 $lastState = $runs[0]['state'] ?? null;
 $gridRuns = array_reverse($runs); // oldest → newest, left → right
+$shortRun = static function (string $id): string {
+    if (preg_match('/(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/', $id, $m)) {
+        return substr($m[1], 5) . ' ' . $m[2];
+    }
+    return substr($id, 0, 10);
+};
 ?>
 <header class="page-head">
   <div>
@@ -53,7 +59,7 @@ $gridRuns = array_reverse($runs); // oldest → newest, left → right
           <th></th>
           <?php foreach ($gridRuns as $r): ?>
             <th title="<?= e($r['run_id']) ?>">
-              <a href="<?= url('/runs/' . (int) $r['id']) ?>"><?= e(substr((string) $r['run_id'], 0, 10)) ?></a>
+              <a href="<?= url('/runs/' . (int) $r['id']) ?>"><?= e($shortRun((string) $r['run_id'])) ?></a>
             </th>
           <?php endforeach; ?>
         </tr>

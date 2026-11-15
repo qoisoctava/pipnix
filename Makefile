@@ -1,4 +1,4 @@
-.PHONY: unit e2e check tick clean-test
+.PHONY: unit e2e ui check tick clean-test
 
 unit:            ## cron/logger unit tests (no DB)
 	php tests/php/cron_test.php
@@ -9,6 +9,9 @@ check: unit      ## php syntax + unit tests
 
 e2e:             ## full integration test (needs dev MySQL on PN_MYSQL_PORT)
 	bash tests/e2e.sh
+
+ui:              ## web console smoke test (auth + every page)
+	bash tests/ui_smoke.sh
 
 tick:            ## one scheduler tick
 	php app/scheduler.php

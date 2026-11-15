@@ -6,6 +6,7 @@ $u = $username ?? '';
 ?>
 <div class="login">
   <section class="brand-panel">
+    <img class="brand-watermark" src="<?= url('/assets/logo-white.png') ?>" alt="">
     <div class="brand-lockup">
       <img src="<?= url('/assets/logo-white.png') ?>" alt="pipnix logo" height="64">
       <span class="brand-name">pipnix</span>

@@ -167,8 +167,10 @@ function dashboard_page(): void
             'SELECT COALESCE(SUM(max_concurrency), 0) AS n FROM pn_dag WHERE is_active = 1')['n'] ?? 0),
     ];
 
-    $lastTick = is_file(Env::logs() . '/cron.log')
-        ? (int) filemtime(Env::logs() . '/cron.log') : null;
+    $heartbeat = Env::path('storage') . '/heartbeat';
+    $lastTick = is_file($heartbeat)
+        ? (int) filemtime($heartbeat)
+        : (is_file(Env::logs() . '/cron.log') ? (int) filemtime(Env::logs() . '/cron.log') : null);
     $health = [
         'database' => true,
         'scheduler' => $lastTick !== null && (time() - $lastTick) < 180,

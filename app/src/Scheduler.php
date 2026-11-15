@@ -17,6 +17,7 @@ final class Scheduler
             return;
         }
         try {
+            @file_put_contents(Env::path('storage') . '/heartbeat', (string) time());
             $defs = DagLoader::loadAll();
             $dags = DagLoader::sync($defs);
             self::scheduleDue($dags);

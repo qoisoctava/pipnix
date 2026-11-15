@@ -1,7 +1,6 @@
 <?php
 /** @var array $user @var string $title @var string $content @var string $nav */
 $nav = $nav ?? '';
-$flash = take_flash();
 $items = [
     ['home',   '/',        '⌂', 'Home'],
     ['dags',   '/dags',    '⬡', 'Dags'],

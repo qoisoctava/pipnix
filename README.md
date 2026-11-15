@@ -109,7 +109,7 @@ normalized JSON). Files are only re-executed when their sha256 changes.
 Read-only console (Phase 5) — server-rendered PHP, no build step:
 
 ```bash
-php -S 127.0.0.1:8099 public/index.php
+php -S 127.0.0.1:8099 -t public public/index.php
 # → http://127.0.0.1:8099  (sign in with the admin created by install.php)
 ```
 

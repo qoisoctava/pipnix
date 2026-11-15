@@ -34,6 +34,15 @@ session_set_cookie_params([
 ]);
 session_start();
 
+// Dev-only convenience: `PIPNIX_UI_DEV=1 php -S …` skips the login form.
+// Guarded to the built-in server so it can never affect a real deployment.
+if (PHP_SAPI === 'cli-server' && getenv('PIPNIX_UI_DEV') === '1'
+    && empty($_SESSION['user'])
+    && !str_starts_with($_SERVER['REQUEST_URI'] ?? '/', '/login')
+    && !str_starts_with($_SERVER['REQUEST_URI'] ?? '/', '/logout')) {
+    $_SESSION['user'] = ['id' => 0, 'username' => 'dev', 'role' => 'admin'];
+}
+
 // ---------------------------------------------------------------- helpers
 function e(?string $value): string
 {
@@ -103,6 +112,7 @@ function render(string $view, array $data = [], string $layout = 'shell'): void
         exit('view missing: ' . e($view));
     }
     $data['user'] = current_user();
+    $data['flash'] = take_flash();
     extract($data, EXTR_SKIP);
     ob_start();
     require $viewFile;
