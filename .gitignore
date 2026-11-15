@@ -1,0 +1,55 @@
+# ============================================================================
+# pipnix — repository ignore rules
+# ============================================================================
+
+# Secrets & local configuration
+app/config.php
+.env
+.env.*
+!.env.example
+
+# Runtime state (logs, pid/result scratch, uploads)
+logs/*
+!logs/cron.log.example
+!logs/runs/
+logs/runs/*
+!logs/runs/.gitkeep
+storage/*
+!storage/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# PHP / Composer (vendor is optional and host-specific)
+vendor/
+composer.lock
+
+# OS / editors / archives
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.zip
+*.tar.gz
+
+# Logs & temp
+*.log
+!logs/cron.log.example
+tmp/
+.tmp/

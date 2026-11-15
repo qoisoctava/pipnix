@@ -1,0 +1,21 @@
+# Normalize to LF in the repository; the working tree can keep native endings.
+* text=auto eol=lf
+
+# Binary design/asset files (no diffs, no EOL conversion)
+*.figcraft binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.pdf binary
+
+# Explicit text formats
+*.php  text eol=lf
+*.py   text eol=lf
+*.sh   text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.svg  text eol=lf
+Makefile text eol=lf
