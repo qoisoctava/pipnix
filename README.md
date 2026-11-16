@@ -104,6 +104,11 @@ DAG = {
 Malformed DAGs are rejected with a precise message (`dagcheck` prints the
 normalized JSON). Files are only re-executed when their sha256 changes.
 
+📖 **Full authoring guide: [docs/DAGS.md](docs/DAGS.md)** — every key, the
+`func`/`command` contracts, schedule semantics, validation rules and patterns.
+Runnable examples: [`dags/examples/`](dags/examples/) (copy to `dags/` to
+activate).
+
 ## Web console
 
 Server-rendered PHP console — no build step, no JS framework:
@@ -206,7 +211,8 @@ lib/                  dag_loader.py + runner.py (stdlib only)
 public/               web console (index.php + views/ + assets/)
 dags/ · jobs/         DAG definitions and task code
 tests/                unit tests (php/) + e2e harness
-docs/                 logo (dark/light), app icon, screenshots
+docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md
+dags/examples/        copy-paste DAG patterns (not auto-loaded)
 schema.sql · Makefile · README.md
 ```
 
