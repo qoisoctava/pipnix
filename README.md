@@ -130,8 +130,10 @@ The front controller auto-detects the app directory; override with the
 </tr>
 </table>
 
-Package management (install / upgrade / requirements.txt) and the action
-screens (trigger, pause, clear, DAG editor, import) arrive in Phase 6.
+Everything is operational end to end: the DAG editor (writes + re-validates
+`dags/<name>.py`), `.py` import with a parsed preview, trigger / pause /
+clear / mark-success actions, venv + pip management with a live log, user
+management and an audit trail.
 
 ## CLI
 
@@ -144,6 +146,7 @@ php app/ops.php pause|resume --dag=...      # scheduling toggle
 php app/ops.php clear --run=34              # requeue task + downstream
 php app/ops.php logs --run=34 --tail=100    # tail an attempt
 php app/ops.php venv:check|list|install ...  # interpreter + pip management
+php app/ops.php prune --days=30             # drop old finished runs + logs
 php app/dagcheck.php --file=dags/x.py       # validate a DAG file
 ```
 
@@ -196,9 +199,8 @@ schema.sql · Makefile · README.md
 | 4 | Operator CLI + unit/e2e tests | done |
 | 5 | Web console — read-only pages + auth | done |
 | 6 | Web console — actions (trigger/clear), DAG editor, import, venv manager | done |
-| 7 | Hardening (error pages, backups, packaging) | next |
+| 7 | Hardening (error pages, retention prune, CI, packaging) | done |
 
 ## License
 
-Not chosen yet — add one before publishing (MIT or Apache-2.0 are typical for
-developer tools).
+[MIT](LICENSE) — free to use, modify and self-host.

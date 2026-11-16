@@ -34,6 +34,56 @@ session_set_cookie_params([
 ]);
 session_start();
 
+// ---------------------------------------------------------------- hardening
+// Native form controls (checkboxes, selects) follow the dark theme.
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: same-origin');
+
+// Uncaught exception → branded 500 page; details go to the error log only.
+set_exception_handler(static function (Throwable $e): void {
+    error_log('[pipnix] uncaught ' . get_class($e) . ': ' . $e->getMessage()
+        . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    render_error_page(500, 'Something went wrong',
+        'An unexpected error occurred. The details were written to the server log.');
+});
+
+// Fatal errors (max execution time, OOM) cannot throw — catch them on shutdown.
+register_shutdown_function(static function (): void {
+    $err = error_get_last();
+    if ($err !== null && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)
+        && !headers_sent()) {
+        error_log('[pipnix] fatal: ' . $err['message'] . ' @ ' . $err['file'] . ':' . $err['line']);
+        http_response_code(500);
+        render_error_page(500, 'Something went wrong',
+            'An unexpected error occurred. The details were written to the server log.');
+    }
+});
+
+/** Branded error page that must never itself fail. */
+function render_error_page(int $code, string $title, string $message): void
+{
+    try {
+        if (!headers_sent()) {
+            http_response_code($code);
+        }
+        $view = __DIR__ . '/views/error.php';
+        $layout = __DIR__ . '/views/bare.php';
+        if (!is_file($view) || !is_file($layout)) {
+            echo "<h1>{$code} — " . htmlspecialchars($title, ENT_QUOTES) . "</h1>";
+            return;
+        }
+        ob_start();
+        require $view;
+        $content = (string) ob_get_clean();
+        // bare.php expects $title + $flash + $content
+        $flash = null;
+        require $layout;
+    } catch (Throwable $t) {
+        echo "<h1>{$code} — error</h1>";
+    }
+}
+
 // Dev-only convenience: `PIPNIX_UI_DEV=1 php -S …` skips the login form.
 // Guarded to the built-in server so it can never affect a real deployment.
 if (PHP_SAPI === 'cli-server' && getenv('PIPNIX_UI_DEV') === '1'
@@ -73,8 +123,9 @@ function csrf_check(): void
 {
     $sent = (string) ($_POST['_csrf'] ?? '');
     if ($sent === '' || !hash_equals((string) ($_SESSION['csrf'] ?? ''), $sent)) {
-        http_response_code(419);
-        exit('CSRF token mismatch — reload the page.');
+        render_error_page(419, 'Session expired',
+            'The form token did not match — go back, reload the page and try again.');
+        exit;
     }
 }
 

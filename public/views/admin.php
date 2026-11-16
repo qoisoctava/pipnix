@@ -70,6 +70,7 @@
     <div><span class="label">Scheduler tick</span><span class="mono">60s (cron)</span></div>
     <div><span class="label">Lock timeout</span><span class="mono"><?= (int) Env::cfg('lock.timeout', 50) ?>s</span></div>
     <div><span class="label">Alerts</span><span class="badge <?= Env::cfg('alerts.enabled') ? 'ok' : 'idle' ?>"><?= Env::cfg('alerts.enabled') ? 'enabled' : 'disabled' ?></span></div>
+    <div><span class="label">Version</span><span class="mono"><?= e(PN_VERSION) ?></span></div>
     <div><span class="label">Environments</span><a class="link mono" href="<?= url('/python') ?>"><?= $venvCount ?> registered</a></div>
   </div>
 </section>

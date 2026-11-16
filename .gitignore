@@ -47,6 +47,7 @@ desktop.ini
 *~
 *.zip
 *.tar.gz
+dist/
 
 # Logs & temp
 *.log

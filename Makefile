@@ -1,4 +1,4 @@
-.PHONY: unit e2e ui check tick clean-test
+.PHONY: unit e2e ui ui-actions check tick clean-test dist
 
 unit:            ## cron/logger unit tests (no DB)
 	php tests/php/cron_test.php
@@ -22,3 +22,9 @@ tick:            ## one scheduler tick
 clean-test:      ## remove e2e leftovers
 	rm -f app/config.php dags/e2e_flow.py dags/e2e_fail.py jobs/e2e_demo.py
 	rm -rf dags/__pycache__ jobs/__pycache__
+
+dist:            ## build a release zip from the tracked files (dist/pipnix-v<version>.zip)
+	@mkdir -p dist && \
+	V=$$(grep -o "PN_VERSION', '[^']*" app/bootstrap.php | cut -d"'" -f3) && \
+	git archive --format=zip --prefix="pipnix/" -o "dist/pipnix-v$$V.zip" HEAD && \
+	echo "built dist/pipnix-v$$V.zip"

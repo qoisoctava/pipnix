@@ -179,6 +179,24 @@ php app/ops.php dags
 php app/ops.php runs --n=5
 php app/ops.php venv:list --name=e2e | head -5
 
+say "12. prune retention"
+php app/ops.php tick >/dev/null
+# age the latest e2e_fail run to 40 days ago, then prune anything older than 30
+mysql -e "UPDATE \`$DB\`.pn_dag_run SET finished_at = DATE_SUB(NOW(), INTERVAL 40 DAY)
+          WHERE dag_id = (SELECT id FROM \`$DB\`.pn_dag WHERE name='e2e_fail')
+          ORDER BY id DESC LIMIT 1;" || fail "aging run failed"
+LOGS_BEFORE=$(ls logs/runs 2>/dev/null | wc -l | tr -d ' ')
+OUT=$(php app/ops.php prune --days=30)
+grep -q "nothing to prune" <<<"$OUT" && fail "prune saw nothing to remove"
+RUNS_LEFT=$(mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_dag_run r JOIN \`$DB\`.pn_dag d ON d.id=r.dag_id
+             WHERE d.name='e2e_fail' AND r.finished_at < DATE_SUB(NOW(), INTERVAL 30 DAY);")
+[[ "$RUNS_LEFT" == "0" ]] || fail "old run survived prune"
+LOGS_AFTER=$(ls logs/runs 2>/dev/null | wc -l | tr -d ' ')
+[[ "$LOGS_AFTER" -lt "$LOGS_BEFORE" ]] || fail "log files not pruned ($LOGS_BEFORE → $LOGS_AFTER)"
+DRY=$(php app/ops.php prune --days=30)
+grep -q "nothing to prune\|dry run" <<<"$DRY" || true
+ok "prune removed old run + its logs"
+
 say "ALL CHECKS PASSED"
 if [[ $KEEP -eq 1 ]]; then
   echo "database $DB kept; config.php still points to it"

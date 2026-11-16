@@ -8,6 +8,7 @@ declare(strict_types=1);
 define('PN_BASE', dirname(__DIR__));
 define('PN_APP', __DIR__);
 define('PN_SRC', __DIR__ . '/src');
+define('PN_VERSION', '1.0.0');
 
 $cfgFile = PN_APP . '/config.php';
 $GLOBALS['pn_config'] = require (is_file($cfgFile) ? $cfgFile : PN_APP . '/config.example.php');

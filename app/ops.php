@@ -79,6 +79,8 @@ function dispatch(string $cmd, array $opts, array $pos): int
             return cmdVenvInstall($opts, $pos);
         case 'venv:uninstall':
             return cmdVenvUninstall($opts, $pos);
+        case 'prune':
+            return cmdPrune($opts);
         default:
             fwrite(STDERR, "unknown command '{$cmd}'\n\n" . helpText());
             return 64;
@@ -103,6 +105,8 @@ pipnix ops
   venv:list [--name=NAME]           installed packages from the DB
   venv:install --name=NAME pkg[==ver] ...
   venv:uninstall --name=NAME pkg
+  prune --days=30 [--dry-run]       drop finished runs + their logs older
+                                    than N days (audit rows are kept)
 TXT;
 }
 
@@ -411,6 +415,54 @@ function cmdVenvUninstall(array $opts, array $pos): int
         cmdVenvCheck(['name' => $name]);
     }
     return $rc === 0 ? 0 : 1;
+}
+
+function cmdPrune(array $opts): int
+{
+    $days = (int) ($opts['days'] ?? 30);
+    if ($days < 1) {
+        fwrite(STDERR, "usage: prune --days=30 [--dry-run]\n");
+        return 64;
+    }
+    $dry = isset($opts['dry-run']);
+    $cutoff = date('Y-m-d H:i:s', time() - $days * 86400);
+
+    $runs = Db::all(
+        'SELECT id FROM pn_dag_run
+          WHERE finished_at IS NOT NULL AND finished_at < ?',
+        [$cutoff]
+    );
+    if ($runs === []) {
+        echo "nothing to prune (nothing finished before {$cutoff})\n";
+        return 0;
+    }
+    $ids = array_map(static fn (array $r): int => (int) $r['id'], $runs);
+    $in  = implode(',', $ids);
+
+    $files = Db::all(
+        "SELECT DISTINCT log_path FROM pn_task_run
+          WHERE dag_run_id IN ({$in}) AND log_path IS NOT NULL AND log_path != ''"
+    );
+    $removed = 0;
+    foreach ($files as $f) {
+        $path = (string) $f['log_path'];
+        if (str_contains($path, '..') || !str_starts_with($path, Env::logs() . '/')) {
+            continue; // only ever delete inside logs/
+        }
+        if (!$dry && is_file($path) && @unlink($path)) {
+            $removed++;
+        }
+    }
+
+    $tr = Db::run("DELETE FROM pn_task_run WHERE dag_run_id IN ({$in})")->rowCount();
+    $dr = Db::run("DELETE FROM pn_dag_run WHERE id IN ({$in})")->rowCount();
+
+    $mode = $dry ? ' (dry run — nothing deleted)' : '';
+    echo "prune --days={$days}{$mode}\n";
+    echo "  dag runs:  {$dr}\n";
+    echo "  task runs: {$tr}\n";
+    echo "  log files: " . ($dry ? count($files) : $removed) . "\n";
+    return 0;
 }
 
 // ---------------------------------------------------------------- helpers
