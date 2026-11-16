@@ -106,7 +106,7 @@ normalized JSON). Files are only re-executed when their sha256 changes.
 
 ## Web console
 
-Read-only console (Phase 5) — server-rendered PHP, no build step:
+Server-rendered PHP console — no build step, no JS framework:
 
 ```bash
 php -S 127.0.0.1:8099 -t public public/index.php
@@ -118,10 +118,41 @@ failures), **Dags** (list + detail with task table and run-history grid),
 **Runs** (filterable list + run detail and logs), **Logs** (per-attempt log
 viewer), **Python** (venvs + package inventory), **Admin** (users, settings).
 
-Deploy on cPanel: copy `public/*` to `public_html/pipnix/` (so the private
-`app/` stays outside the web root), or point the document root at `public/`.
-The front controller auto-detects the app directory; override with the
-`PIPNIX_APP` environment variable if needed.
+## Deploy to cPanel
+
+pipnix ships as one release zip and runs on plain shared hosting — no root,
+no workers, no Node build:
+
+```bash
+make dist                                        # dist/pipnix-v1.0.0.zip
+```
+
+Then in cPanel:
+
+1. **Upload & extract** the zip to `/home/USER/` (File Manager).
+2. Copy the contents of `pipnix/public/` into `public_html/pipnix/` — everything
+   else stays in `~/pipnix/`, outside the web root. The front controller
+   auto-detects `~/pipnix/app`; override with the `PIPNIX_APP` env var if needed.
+3. **MultiPHP Manager** → PHP 8.1+ for the domain.
+4. **MySQL® Databases** → create DB + user (ALL PRIVILEGES).
+5. Copy `app/config.example.php` → `app/config.php`, fill in the DB credentials,
+   then run once in Terminal:
+   `php app/install.php --admin=you:strong-password`
+6. **Setup Python App** → create a venv, register it in the console
+   (**Python → Register environment**, tick *make default*).
+7. **Cron Jobs** → every minute:
+
+   ```
+   * * * * * /usr/local/bin/php /home/USER/pipnix/app/scheduler.php >> /home/USER/pipnix/logs/cron.log 2>&1
+   ```
+
+8. Log in at `https://yourdomain.com/pipnix/`, import a DAG, **Trigger**, done.
+
+Full walkthrough (with a troubleshooting table, retention cron and a
+security checklist): **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+`app/config.php`, `dags/`, `jobs/` and `logs/` never leave `~/pipnix/` —
+the web root only ever exposes the contents of `public/`.
 
 <table>
 <tr>
