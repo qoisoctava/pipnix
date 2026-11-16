@@ -14,8 +14,8 @@ $GLOBALS['pn_config'] = require (is_file($cfgFile) ? $cfgFile : PN_APP . '/confi
 
 date_default_timezone_set((string) ($GLOBALS['pn_config']['timezone'] ?? 'UTC'));
 
-foreach (['Env', 'Db', 'Lock', 'Cron', 'Logger', 'Alerter',
-          'DagLoader', 'Scheduler', 'Runner'] as $class) {
+foreach (['Env', 'Db', 'Lock', 'Cron', 'Logger', 'Alerter', 'Audit',
+          'DagWriter', 'DagLoader', 'Scheduler', 'Runner', 'TaskOps'] as $class) {
     $file = PN_SRC . '/' . $class . '.php';
     if (!is_file($file)) {
         fwrite(STDERR, "pipnix: missing class file {$file}\n");

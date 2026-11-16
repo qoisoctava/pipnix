@@ -32,9 +32,21 @@
         <td class="mono small"><?= e($t['started_at'] ?? '—') ?></td>
         <td class="mono small"><?= e(human_duration($t['started_at'], $t['finished_at'])) ?></td>
         <td class="mono small"><?= $t['exit_code'] !== null ? (int) $t['exit_code'] : '—' ?></td>
-        <td class="right">
+        <td class="right nowrap">
           <?php if (!empty($t['log_path'])): ?>
             <a class="link small" href="<?= url('/logs/' . (int) $t['id']) ?>">Logs</a>
+          <?php endif; ?>
+          <?php if (can('clear') && !in_array($t['state'], ['running'], true)): ?>
+            <form class="inline" method="post" action="<?= url('/task/' . (int) $t['id'] . '/clear') ?>">
+              <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+              <button class="btn btn-sm" type="submit" title="Clear this task and downstream">Clear</button>
+            </form>
+          <?php endif; ?>
+          <?php if (can('mark') && in_array($t['state'], ['failed', 'timed_out'], true)): ?>
+            <form class="inline" method="post" action="<?= url('/task/' . (int) $t['id'] . '/mark-success') ?>">
+              <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+              <button class="btn btn-sm" type="submit" title="Mark success and requeue downstream">Mark ✓</button>
+            </form>
           <?php endif; ?>
         </td>
       </tr>

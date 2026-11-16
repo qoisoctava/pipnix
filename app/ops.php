@@ -77,6 +77,8 @@ function dispatch(string $cmd, array $opts, array $pos): int
             return cmdVenvList($opts);
         case 'venv:install':
             return cmdVenvInstall($opts, $pos);
+        case 'venv:uninstall':
+            return cmdVenvUninstall($opts, $pos);
         default:
             fwrite(STDERR, "unknown command '{$cmd}'\n\n" . helpText());
             return 64;
@@ -100,6 +102,7 @@ pipnix ops
   venv:check [--name=NAME]          refresh interpreter + package inventory
   venv:list [--name=NAME]           installed packages from the DB
   venv:install --name=NAME pkg[==ver] ...
+  venv:uninstall --name=NAME pkg
 TXT;
 }
 
@@ -235,59 +238,13 @@ function cmdClear(array $opts): int
         fwrite(STDERR, "usage: clear --run=<task_run_id>\n");
         return 64;
     }
-    $tr = Db::one(
-        'SELECT tr.*, t.name AS task_name, t.dag_id
-           FROM pn_task_run tr JOIN pn_task t ON t.id = tr.task_id
-          WHERE tr.id = ?',
-        [$id]
-    );
-    if (!$tr) {
-        fwrite(STDERR, "unknown task_run {$id}\n");
+    try {
+        $res = TaskOps::clear($id);
+    } catch (InvalidArgumentException $e) {
+        fwrite(STDERR, $e->getMessage() . "\n");
         return 1;
     }
-    $dagRunId = (int) $tr['dag_run_id'];
-    $dagId    = (int) $tr['dag_id'];
-
-    // dependency graph of this dag
-    $tasks = Db::all('SELECT id, name, depends_on FROM pn_task WHERE dag_id = ?', [$dagId]);
-    $deps = [];
-    $idByName = [];
-    foreach ($tasks as $t) {
-        $deps[$t['name']] = $t['depends_on'] === '' ? [] : explode(',', (string) $t['depends_on']);
-        $idByName[$t['name']] = (int) $t['id'];
-    }
-
-    // collect the task + all downstream tasks (reverse edges)
-    $reset = [$tr['task_name'] => true];
-    $queue = [$tr['task_name']];
-    while ($queue) {
-        $n = array_pop($queue);
-        foreach ($deps as $task => $ds) {
-            if (in_array($n, $ds, true) && !isset($reset[$task])) {
-                $reset[$task] = true;
-                $queue[] = $task;
-            }
-        }
-    }
-
-    $count = 0;
-    foreach (array_keys($reset) as $taskName) {
-        $taskId = $idByName[$taskName] ?? null;
-        if ($taskId === null) {
-            continue;
-        }
-        $count += Db::run(
-            'UPDATE pn_task_run
-                SET state = ?, attempt = 1, started_at = NULL, finished_at = NULL,
-                    next_attempt_at = NULL, pid = NULL, exit_code = NULL,
-                    error = NULL, alerted = 0, updated_at = ?
-              WHERE dag_run_id = ? AND task_id = ?',
-            ['queued', Env::now(), $dagRunId, $taskId]
-        )->rowCount();
-    }
-    Db::run("UPDATE pn_dag_run SET state = 'running', finished_at = NULL WHERE id = ?", [$dagRunId]);
-
-    echo "cleared {$count} task run(s) in dag_run #{$dagRunId} (task {$tr['task_name']} + downstream)\n";
+    echo "cleared {$res['count']} task run(s) in dag_run #{$res['dag_run_id']} (task {$res['task']} + downstream)\n";
     echo "run `php app/ops.php tick` to dispatch\n";
     return 0;
 }
@@ -428,6 +385,30 @@ function cmdVenvInstall(array $opts, array $pos): int
     if ($rc === 0) {
         $opts2 = ['name' => $name];
         cmdVenvCheck($opts2);
+    }
+    return $rc === 0 ? 0 : 1;
+}
+
+function cmdVenvUninstall(array $opts, array $pos): int
+{
+    $name = (string) ($opts['name'] ?? '');
+    $venv = Db::one('SELECT * FROM pn_venv WHERE name = ?', [$name]);
+    if (!$venv) {
+        fwrite(STDERR, "unknown venv '{$name}'\n");
+        return 1;
+    }
+    if ($pos === []) {
+        fwrite(STDERR, "usage: venv:uninstall --name=NAME pkg\n");
+        return 64;
+    }
+    $path = rtrim((string) $venv['path'], '/');
+    $py = is_file($path . '/bin/python') ? $path . '/bin/python' : $path . '/bin/python3';
+    $cmd = array_merge([$py, '-m', 'pip', 'uninstall', '-y'], $pos);
+    echo '$ ' . implode(' ', array_map('escapeshellarg', $cmd)) . "\n";
+    $rc = procRunPassthrough($cmd);
+    echo "pip exited with {$rc}\n";
+    if ($rc === 0) {
+        cmdVenvCheck(['name' => $name]);
     }
     return $rc === 0 ? 0 : 1;
 }

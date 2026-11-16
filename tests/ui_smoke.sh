@@ -177,7 +177,25 @@ ok "python list + detail"
 
 ADMIN=$(get /admin)
 grep -q "Administrator\|admin" <<<"$ADMIN" || fail "admin page missing users"
+grep -q "Settings" <<<"$ADMIN" || fail "admin page missing settings card"
 ok "admin (admin role)"
+
+AUDIT=$(get /admin/audit)
+grep -q "Audit log" <<<"$AUDIT" || fail "audit page missing"
+ok "audit page"
+
+EDITOR=$(get /dags/new)
+grep -q "New Dag" <<<"$EDITOR" || fail "dag editor missing"
+grep -q "Save &amp; validate" <<<"$EDITOR" || fail "editor missing save button"
+ok "dag editor"
+
+IMPORT=$(get /dags/import)
+grep -q "Drop or choose a .py file" <<<"$IMPORT" || fail "import page missing dropzone"
+ok "import page"
+
+PYLOG=$(get /python/reporting/log)
+[[ "$(code /python/reporting/log)" == "200" ]] || fail "pip log page not 200"
+ok "pip log page"
 
 [[ "$(code /no-such-page)" == "404" ]] || fail "404 route"
 ok "404 page"

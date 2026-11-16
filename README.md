@@ -152,11 +152,16 @@ php app/dagcheck.php --file=dags/x.py       # validate a DAG file
 ```bash
 make check                    # PHP lint + cron/logger unit tests (no DB)
 PN_MYSQL_PORT=3307 make e2e   # full integration test against a dev MySQL
+PN_MYSQL_PORT=3307 make ui    # web console smoke test (auth + every page)
+PN_MYSQL_PORT=3307 make ui-actions  # write-action tests (editor, import, trigger, venv, users)
 ```
 
 The e2e suite provisions a real venv and database, then verifies: schema install,
 pip inventory, DAG loading with hash cache, trigger → dispatch → success,
 `result_json`, per-attempt logs, failure cascade, clear/rerun, pause/resume.
+The web suites cover login/roles, every read-only page, the DAG editor and
+import flow, trigger/pause/clear/mark actions, the venv package manager with
+its live pip log, user management and the audit log.
 
 ## Repository layout
 
@@ -190,8 +195,8 @@ schema.sql · Makefile · README.md
 | 3 | Execution engine (tick, runner, retries, cascade, logs) | done |
 | 4 | Operator CLI + unit/e2e tests | done |
 | 5 | Web console — read-only pages + auth | done |
-| 6 | Web console — actions (trigger/clear), DAG editor, import, venv manager | next |
-| 7 | Hardening (error pages, backups, packaging) | planned |
+| 6 | Web console — actions (trigger/clear), DAG editor, import, venv manager | done |
+| 7 | Hardening (error pages, backups, packaging) | next |
 
 ## License
 

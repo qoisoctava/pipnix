@@ -102,6 +102,17 @@ CREATE TABLE IF NOT EXISTS pn_task_run (
   CONSTRAINT fk_taskrun_task   FOREIGN KEY (task_id)    REFERENCES pn_task(id)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------------------------------------------------------------- audit
+CREATE TABLE IF NOT EXISTS pn_audit (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  created_at DATETIME  NOT NULL,
+  actor      VARCHAR(64)  NOT NULL,
+  action     VARCHAR(64)  NOT NULL,
+  object     VARCHAR(255) NOT NULL,
+  ip         VARCHAR(45)  NULL,
+  KEY idx_audit_time (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ----------------------------------------------------------------- users
 CREATE TABLE IF NOT EXISTS pn_user (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

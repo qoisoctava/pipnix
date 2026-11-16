@@ -27,6 +27,27 @@ $shortRun = static function (string $id): string {
       <?php if ($venvName): ?> · venv <span class="mono"><?= e($venvName) ?></span><?php endif; ?>
       · loader <span class="mono"><?= e($dag['loader']) ?></span>
     </p>
+    <div class="toolbar" style="margin-top:10px">
+      <?php if (can('trigger')): ?>
+        <form class="inline" method="post" action="<?= url('/dags/' . rawurlencode($dag['name']) . '/trigger') ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="btn btn-primary" type="submit">▶ Trigger</button>
+        </form>
+        <form class="inline" method="post" action="<?= url('/dags/' . rawurlencode($dag['name']) . ((int) $dag['is_active'] === 1 ? '/pause' : '/resume')) ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="btn" type="submit"><?= (int) $dag['is_active'] === 1 ? '⏸ Pause' : '⏵ Resume' ?></button>
+        </form>
+      <?php endif; ?>
+      <?php if (can('edit')): ?>
+        <a class="btn" href="<?= url('/dags/' . rawurlencode($dag['name']) . '/edit') ?>">✎ Edit</a>
+        <form class="inline" method="post" action="<?= url('/dags/' . rawurlencode($dag['name']) . '/delete') ?>"
+              onsubmit="return confirm('Delete <?= e($dag['name']) ?> and its run history?')">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="btn btn-danger" type="submit">⌫ Delete</button>
+        </form>
+      <?php endif; ?>
+      <a class="btn" href="<?= url('/dags/import') ?>">Import</a>
+    </div>
   </div>
 </header>
 

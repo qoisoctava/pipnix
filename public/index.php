@@ -22,6 +22,7 @@ if ($rawPath === '/lib.php' || str_starts_with($rawPath, '/views')) {
 }
 
 require __DIR__ . '/lib.php';
+require __DIR__ . '/actions.php';
 
 // ------------------------------------------------------------------ routing
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -61,6 +62,12 @@ if ($method === 'POST' && $page === 'logout') {
 
 require_login();
 
+// ------------------------------------------------------------------ write actions
+if ($method === 'POST') {
+    handle_post($page, $segments);
+    return;
+}
+
 // ------------------------------------------------------------------ pages
 switch ($page) {
     case '':
@@ -69,6 +76,18 @@ switch ($page) {
     case 'dags':
         if (!isset($segments[1])) {
             dags_page();
+            return;
+        }
+        if ($segments[1] === 'new') {
+            dag_edit_page(null);
+            return;
+        }
+        if ($segments[1] === 'import') {
+            dag_import_page();
+            return;
+        }
+        if (($segments[2] ?? '') === 'edit') {
+            dag_edit_page((string) $segments[1]);
             return;
         }
         dag_page((string) $segments[1]);
@@ -84,10 +103,18 @@ switch ($page) {
         logs_page((int) ($segments[1] ?? ($_GET['task'] ?? 0)));
         return;
     case 'python':
+        if (isset($segments[1]) && ($segments[2] ?? '') === 'log') {
+            venv_log_page((string) $segments[1]);
+            return;
+        }
         python_page($segments[1] ?? null);
         return;
     case 'admin':
         require_role('admin');
+        if (($segments[1] ?? '') === 'audit') {
+            audit_page();
+            return;
+        }
         admin_page();
         return;
     default:

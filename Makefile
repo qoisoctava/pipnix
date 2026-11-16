@@ -13,6 +13,9 @@ e2e:             ## full integration test (needs dev MySQL on PN_MYSQL_PORT)
 ui:              ## web console smoke test (auth + every page)
 	bash tests/ui_smoke.sh
 
+ui-actions:      ## web console write-action tests (editor, import, trigger, venv, users)
+	bash tests/ui_actions.sh
+
 tick:            ## one scheduler tick
 	php app/scheduler.php
 

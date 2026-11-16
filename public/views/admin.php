@@ -1,12 +1,16 @@
 <?php /** @var array $users @var int $venvCount */ ?>
 <header class="page-head">
   <h1>Admin</h1>
+  <div class="toolbar">
+    <a class="btn" href="<?= url('/admin/audit') ?>">Audit log</a>
+    <a class="btn" href="<?= url('/python') ?>">Environments</a>
+  </div>
 </header>
 
 <section class="card">
   <div class="card-head"><h3>Users</h3><span class="muted small"><?= count($users) ?> accounts</span></div>
   <table class="table">
-    <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th></tr></thead>
+    <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead>
     <tbody>
     <?php foreach ($users as $u): ?>
       <tr>
@@ -15,11 +19,48 @@
         <td><span class="chip"><?= e($u['role']) ?></span></td>
         <td><span class="badge <?= (int) $u['is_active'] === 1 ? 'ok' : 'idle' ?>"><?= (int) $u['is_active'] === 1 ? 'active' : 'disabled' ?></span></td>
         <td class="mono small"><?= e($u['last_login_at'] ?? 'never') ?></td>
+        <td class="nowrap">
+          <form class="inline" method="post" action="<?= url('/admin/users/' . (int) $u['id'] . '/toggle') ?>">
+            <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+            <button class="btn btn-sm" type="submit"><?= (int) $u['is_active'] === 1 ? 'Disable' : 'Enable' ?></button>
+          </form>
+          <form class="inline" method="post" action="<?= url('/admin/users/' . (int) $u['id'] . '/password') ?>">
+            <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+            <input name="password" type="password" placeholder="new password" size="12" minlength="8" required>
+            <button class="btn btn-sm" type="submit">Set</button>
+          </form>
+        </td>
       </tr>
     <?php endforeach; ?>
     </tbody>
   </table>
-  <p class="muted small">Invite/reset flows are part of the next phase.</p>
+  <form method="post" action="<?= url('/admin/users/new') ?>" class="form-grid" style="margin-top:16px">
+    <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+    <div>
+      <label for="u-name">New user</label>
+      <input id="u-name" name="username" pattern="[a-z0-9][a-z0-9_.-]{2,31}" placeholder="operator1" required>
+    </div>
+    <div>
+      <label for="u-mail">Email</label>
+      <input id="u-mail" name="email" type="email" placeholder="ops@example.com">
+    </div>
+    <div>
+      <label for="u-pass">Password</label>
+      <input id="u-pass" name="password" type="password" minlength="8" required>
+    </div>
+    <div>
+      <label for="u-role">Role</label>
+      <select id="u-role" name="role">
+        <option value="viewer">viewer</option>
+        <option value="operator">operator</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button class="btn btn-primary" type="submit">Create user</button>
+    </div>
+  </form>
 </section>
 
 <section class="card">

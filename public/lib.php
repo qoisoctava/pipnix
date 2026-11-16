@@ -97,7 +97,7 @@ function require_role(string $role): void
     if (!$user || ($order[$user['role']] ?? -1) < ($order[$role] ?? 99)) {
         http_response_code(403);
         render('error', ['code' => 403, 'title' => 'No access',
-            'message' => 'Your role cannot open this page.'], 'error');
+            'message' => 'Your role cannot open this page.'], 'bare');
         exit;
     }
 }
@@ -130,6 +130,98 @@ function take_flash(): ?array
     $f = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
     return $f;
+}
+
+// ---------------------------------------------------------------- helpers (web)
+/** Minimum role required for a UI action. */
+function can(string $action): bool
+{
+    $user = current_user();
+    if (!$user) {
+        return false;
+    }
+    $order = ['viewer' => 0, 'operator' => 1, 'admin' => 2];
+    $need = [
+        'trigger' => 'operator', 'pause' => 'operator', 'clear' => 'operator',
+        'mark' => 'operator',
+        'edit' => 'admin', 'import' => 'admin', 'delete' => 'admin',
+        'venv' => 'admin', 'users' => 'admin', 'audit' => 'admin',
+    ];
+    return ($order[$user['role']] ?? -1) >= ($order[$need[$action] ?? 'admin'] ?? 2);
+}
+
+function client_ip(): ?string
+{
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $key) {
+        if (!empty($_SERVER[$key])) {
+            $ip = trim(explode(',', (string) $_SERVER[$key])[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return null;
+}
+
+function audit(string $action, string $object): void
+{
+    $user = current_user();
+    Audit::record($user['username'] ?? 'system', $action, $object, client_ip());
+}
+
+function slug(string $value): string
+{
+    return strtolower(trim((string) preg_replace('/[^A-Za-z0-9_.-]+/', '-', $value) ?? ''));
+}
+
+/** Run `php app/ops.php ...` detached, output appended to a log file. @return int pid */
+function spawn_ops(array $args, string $logFile): int
+{
+    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(PN_APP . '/ops.php');
+    foreach ($args as $arg) {
+        $cmd .= ' ' . escapeshellarg((string) $arg);
+    }
+    @touch($logFile);
+    $full = 'nohup ' . $cmd . ' >> ' . escapeshellarg($logFile) . ' 2>&1 & echo $!';
+    return (int) trim((string) @shell_exec($full));
+}
+
+/** Run `php app/ops.php ...` synchronously with a deadline. @return array{0:int,1:string} */
+function run_ops_sync(array $args, int $timeout = 90): array
+{
+    $cmd = array_merge([PHP_BINARY, PN_APP . '/ops.php'], $args);
+    $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $proc = @proc_open($cmd, $desc, $pipes, PN_BASE);
+    if (!is_resource($proc)) {
+        return [127, 'cannot start ops'];
+    }
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+    $out = '';
+    $deadline = microtime(true) + $timeout;
+    while (true) {
+        $out .= (string) stream_get_contents($pipes[1]) . (string) stream_get_contents($pipes[2]);
+        $st = proc_get_status($proc);
+        if (!$st['running']) {
+            break;
+        }
+        if (microtime(true) > $deadline) {
+            @proc_terminate($proc, 9);
+            $out .= "\n[pipnix] timed out after {$timeout}s";
+            break;
+        }
+        usleep(50000);
+    }
+    $out .= (string) stream_get_contents($pipes[1]) . (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $rc = proc_close($proc);
+    return [$rc, $out];
+}
+
+function venv_log_path(string $name): string
+{
+    return Env::logs() . '/venv-' . slug($name) . '.log';
 }
 
 // ---------------------------------------------------------------- helpers (data)
