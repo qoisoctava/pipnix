@@ -140,6 +140,38 @@ p { margin: 8px 0; }
   background: var(--input); border: 1px solid var(--border);
   border-radius: 8px; padding: 6px 11px; font-size: 12px; color: var(--label);
 }
+.chip.on { color: var(--text); border-color: var(--primary); background: #14312E; }
+
+/* ---------------------------------------------------------------- bundled docs (markdown) */
+.doc { max-width: 900px; font-size: 14px; line-height: 1.65; }
+.doc h1, .doc h2, .doc h3, .doc h4 { color: var(--title); margin: 22px 0 10px; }
+.doc h1 { font-size: 20px; } .doc h2 { font-size: 17px; }
+.doc h3 { font-size: 14px; } .doc h4 { font-size: 13px; }
+.doc p { margin: 10px 0; }
+.doc ul, .doc ol { margin: 10px 0 10px 22px; padding: 0; }
+.doc li { margin: 4px 0; }
+.doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.doc code {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--input); border: 1px solid var(--border);
+  border-radius: 5px; padding: 1px 5px;
+}
+.doc pre.log {
+  background: #0B1220; border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; overflow-x: auto; margin: 10px 0;
+}
+.doc pre.log code { background: none; border: none; padding: 0; color: var(--text); }
+.doc .md-table { width: 100%; margin: 12px 0; }
+.doc .md-table th, .doc .md-table td {
+  text-align: left; padding: 7px 10px;
+  border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.doc .md-table th { color: var(--label); font-size: 12px; }
+.doc blockquote {
+  margin: 10px 0; padding: 8px 14px; color: var(--label);
+  border-left: 3px solid var(--primary); background: var(--input);
+  border-radius: 0 8px 8px 0;
+}
 
 .bar { height: 8px; background: var(--border); border-radius: 999px; margin-top: 6px; }
 .bar > span { display: block; height: 8px; border-radius: 999px; }

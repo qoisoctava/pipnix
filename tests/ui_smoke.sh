@@ -169,6 +169,17 @@ LOG=$(get "/logs/$TASK_ID")
 grep -q "Log" <<<"$LOG" || fail "log page missing"
 ok "log viewer"
 
+LOGIDX=$(get /logs)
+grep -q "Task runs" <<<"$LOGIDX" || fail "logs index page missing"
+grep -q "ui_flow" <<<"$LOGIDX" || fail "logs index missing recent task"
+ok "logs index (nav landing)"
+
+DOCS=$(get /docs)
+grep -q "Deploying to cPanel" <<<"$DOCS" || fail "docs page missing"
+DOCS2=$(get /docs/dags)
+grep -q "Writing DAGs\|DAG-level keys\|Task-level keys" <<<"$DOCS2" || fail "dags doc missing"
+ok "bundled docs pages"
+
 PY=$(get /python)
 grep -q "reporting" <<<"$PY" || fail "python page missing venv"
 PYD=$(get /python/reporting)

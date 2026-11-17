@@ -34,7 +34,7 @@ $items = [
       <?php endforeach; ?>
     </nav>
     <div class="nav-bottom">
-      <a class="nav-item" href="https://github.com" target="_blank" rel="noreferrer">
+      <a class="nav-item" href="<?= url('/docs') ?>" title="Bundled guides">
         <span class="glyph">❑</span><span class="label">Docs</span>
       </a>
       <form method="post" action="<?= url('/logout') ?>">

@@ -100,7 +100,10 @@ switch ($page) {
         run_page((int) $segments[1]);
         return;
     case 'logs':
-        logs_page((int) ($segments[1] ?? ($_GET['task'] ?? 0)));
+        logs_page(isset($segments[1]) ? (int) $segments[1] : (isset($_GET['task']) ? (int) $_GET['task'] : 0));
+        return;
+    case 'docs':
+        docs_page((string) ($segments[1] ?? ''));
         return;
     case 'python':
         if (isset($segments[1]) && ($segments[2] ?? '') === 'log') {
@@ -355,6 +358,10 @@ function run_page(int $id): void
 // ================================================================== logs
 function logs_page(int $taskRunId): void
 {
+    if ($taskRunId === 0) {
+        logs_index_page();
+        return;
+    }
     $tr = Db::one(
         'SELECT tr.*, t.name AS task_name, d.name AS dag_name, r.run_id
            FROM pn_task_run tr
@@ -374,6 +381,69 @@ function logs_page(int $taskRunId): void
         'nav' => 'logs',
         'tr' => $tr,
         'lines' => $lines,
+    ]);
+}
+
+/** Landing page for the Logs nav item: the newest task runs + their logs. */
+function logs_index_page(): void
+{
+    $state = (string) ($_GET['state'] ?? '');
+    $where = '';
+    $params = [];
+    if (in_array($state, ['queued', 'running', 'retrying', 'success', 'failed',
+                          'timed_out', 'upstream_failed', 'skipped'], true)) {
+        $where = 'WHERE tr.state = ?';
+        $params[] = $state;
+    }
+    $rows = Db::all(
+        "SELECT tr.id, tr.state, tr.attempt, tr.started_at, tr.finished_at,
+                tr.dag_run_id, r.run_id, d.name AS dag_name, t.name AS task_name,
+                (tr.log_path IS NOT NULL AND tr.log_path != '') AS has_log
+           FROM pn_task_run tr
+           JOIN pn_dag_run r ON r.id = tr.dag_run_id
+           JOIN pn_dag d     ON d.id = r.dag_id
+           JOIN pn_task t    ON t.id = tr.task_id
+           {$where}
+          ORDER BY tr.id DESC
+          LIMIT 100",
+        $params
+    );
+    render('log_index', [
+        'title' => 'Logs',
+        'nav' => 'logs',
+        'state' => $state,
+        'rows' => $rows,
+    ]);
+}
+
+// ================================================================== docs
+function docs_page(string $slug): void
+{
+    $docs = [
+        ''        => ['Deploying to cPanel', 'deploy'],
+        'deploy'  => ['Deploying to cPanel', 'deploy'],
+        'dags'    => ['Writing DAGs', 'DAGS'],
+    ];
+    if (!isset($docs[$slug])) {
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Doc not found',
+            'message' => 'Available docs: deploy, dags.'], 'bare');
+        return;
+    }
+    [$title, $file] = $docs[$slug];
+    $path = Env::path('docs') . '/' . $file . '.md';
+    if (!is_file($path)) {
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Doc not found',
+            'message' => 'The guide file is missing on this install.'], 'bare');
+        return;
+    }
+    render('doc', [
+        'title' => $title,
+        'nav' => 'docs',
+        'slug' => $slug === 'deploy' ? '' : $slug,
+        'head' => $title,
+        'html' => md_to_html((string) file_get_contents($path)),
     ]);
 }
 

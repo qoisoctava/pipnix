@@ -355,3 +355,145 @@ function tail_lines(string $path, int $limit = 400): array
     $lines = file($path, FILE_IGNORE_NEW_LINES) ?: [];
     return array_slice($lines, -$limit);
 }
+
+// ---------------------------------------------------------------- mini markdown
+/**
+ * Render the bundled guides (docs/*.md) to HTML. Supports the subset used by
+ * those files: headings, fenced code, pipe tables, lists, rules, inline
+ * code/bold/links. Everything is HTML-escaped first, so the content can never
+ * inject markup.
+ */
+function md_to_html(string $md): string
+{
+    $lines = preg_split('/\R/', trim($md)) ?: [];
+    $out = [];
+    $inCode = false;
+    $code = [];
+    $list = null;        // 'ul' | 'ol' | null
+    $listItems = [];
+    $table = [];         // collected rows of the current table
+
+    $flushList = static function () use (&$list, &$listItems, &$out): void {
+        if ($list === null) {
+            return;
+        }
+        $out[] = '<' . $list . '>';
+        foreach ($listItems as $item) {
+            $out[] = '<li>' . md_inline($item) . '</li>';
+        }
+        $out[] = '</' . $list . '>';
+        $list = null;
+        $listItems = [];
+    };
+    $flushTable = static function () use (&$table, &$out): void {
+        if ($table === []) {
+            return;
+        }
+        $out[] = '<table class="md-table"><thead><tr>';
+        foreach ($table[0] as $cell) {
+            $out[] = '<th>' . md_inline($cell) . '</th>';
+        }
+        $out[] = '</tr></thead><tbody>';
+        foreach (array_slice($table, 1) as $row) {
+            $out[] = '<tr>';
+            foreach ($row as $cell) {
+                $out[] = '<td>' . md_inline($cell) . '</td>';
+            }
+            $out[] = '</tr>';
+        }
+        $out[] = '</tbody></table>';
+        $table = [];
+    };
+
+    foreach ($lines as $line) {
+        if (str_starts_with(trim($line), '```')) {
+            if ($inCode) {
+                $out[] = '</code></pre>';
+                $inCode = false;
+            } else {
+                $flushList();
+                $flushTable();
+                $out[] = '<pre class="log"><code>';
+                $inCode = true;
+            }
+            continue;
+        }
+        if ($inCode) {
+            $out[] = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
+            continue;
+        }
+
+        $t = trim($line);
+        if ($t === '') {
+            // keep an open list across blank lines (numbering must survive),
+            // but close the current table
+            $flushTable();
+            continue;
+        }
+        if (str_starts_with($t, '|') && str_ends_with($t, '|')) {
+            $cells = array_map('trim', explode('|', trim($t, '|')));
+            if (isset($table[0]) && preg_match('/^:?-{3,}:?$/', str_replace(' ', '', $cells[0] ?? ''))) {
+                continue; // separator row
+            }
+            $table[] = $cells;
+            continue;
+        }
+        $flushTable();
+
+        if (preg_match('/^(#{1,4})\s+(.*)$/', $t, $m)) {
+            $flushList();
+            $level = strlen($m[1]);
+            $out[] = '<h' . $level . '>' . md_inline($m[2]) . '</h' . $level . '>';
+            continue;
+        }
+        if ($t === '---') {
+            $flushList();
+            $out[] = '<hr>';
+            continue;
+        }
+        if (preg_match('/^[-*]\s+(.*)$/', $t, $m)) {
+            if ($list !== 'ul') {
+                $flushList();
+                $list = 'ul';
+            }
+            $listItems[] = $m[1];
+            continue;
+        }
+        if (preg_match('/^\d+\.\s+(.*)$/', $t, $m)) {
+            if ($list !== 'ol') {
+                $flushList();
+                $list = 'ol';
+            }
+            $listItems[] = $m[1];
+            continue;
+        }
+        // indented continuation of the previous list item (soft wrap)
+        if ($list !== null && preg_match('/^\s{2,}\S/', $line)) {
+            $listItems[count($listItems) - 1] .= ' ' . $t;
+            continue;
+        }
+        if (preg_match('/^>\s?(.*)$/', $t, $m)) {
+            $flushList();
+            $out[] = '<blockquote>' . md_inline($m[1]) . '</blockquote>';
+            continue;
+        }
+        $flushList();
+        $out[] = '<p>' . md_inline($t) . '</p>';
+    }
+    if ($inCode) {
+        $out[] = '</code></pre>';
+    }
+    $flushList();
+    $flushTable();
+    return implode("\n", $out);
+}
+
+/** Inline markdown (already-escaped text in, safe HTML out). */
+function md_inline(string $text): string
+{
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    $text = preg_replace('/`([^`]+)`/', '<code>$1</code>', $text) ?? $text;
+    $text = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $text) ?? $text;
+    $text = preg_replace('/\[([^\]]+)\]\(([^)\s]+)\)/', '<a class="link" href="$2">$1</a>', $text) ?? $text;
+    return $text;
+}
