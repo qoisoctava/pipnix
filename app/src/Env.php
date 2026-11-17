@@ -88,7 +88,11 @@ final class Env
      */
     public static function pyEnv(?array $py = null): array
     {
+        // PN_BASE itself must be on the path for package-style funcs like
+        // "jobs.reporting.extract" (jobs/ is a package → the parent dir is
+        // what Python needs); lib/, dags/, jobs/ cover top-level modules.
         $paths = [
+            PN_BASE,
             PN_BASE . '/lib',
             PN_BASE . '/dags',
             PN_BASE . '/jobs',

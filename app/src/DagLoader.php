@@ -128,6 +128,7 @@ final class DagLoader
         $err .= (string) stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
+        $exit  = (int) ($status['exitcode'] ?? -1);
         proc_close($proc);
 
         if ($timedOut) {
@@ -135,7 +136,12 @@ final class DagLoader
         }
         $json = json_decode(trim($out), true);
         if (!is_array($json)) {
-            return ['ok' => false, 'error' => 'loader produced no JSON',
+            $error = 'loader produced no JSON';
+            if (trim($err) === '' && trim($out) === '' && $exit !== 0) {
+                // empty stderr + non-zero exit → the interpreter never even ran
+                $error .= " (python exited with code $exit — check 'python_bin' in app/config.php)";
+            }
+            return ['ok' => false, 'error' => $error,
                     'traceback' => trim($err) ?: trim($out)];
         }
         if (empty($json['ok'])) {
