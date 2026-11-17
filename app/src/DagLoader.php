@@ -95,6 +95,10 @@ final class DagLoader
     private static function runPythonLoader(string $path): array
     {
         $py  = Env::python();
+        if (!empty($py['error'])) {
+            return ['ok' => false, 'error' => $py['error']
+                . " — fix the venv path, or unset it as default (Python page)"];
+        }
         $cmd = [$py['bin'], PN_BASE . '/lib/dag_loader.py', $path];
         $env = Env::pyEnv($py);
 

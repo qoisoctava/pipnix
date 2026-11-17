@@ -78,6 +78,12 @@ final class Runner
         $timeout = (int) $tr['timeout'];
         $resultFile = null;
 
+        if (!empty($py['error'])) {
+            Logger::line($logPath, 'pipnix: ' . $py['error']
+                . ' — check the venv path on the Python page, or pick another environment');
+            return [127, false];
+        }
+
         if ($tr['runner'] === 'python' && !empty($tr['func'])) {
             $resultFile = tempnam(Env::path('storage'), 'result_') ?: null;
             $cmd = [

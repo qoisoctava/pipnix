@@ -61,23 +61,45 @@ final class Env
             $row = Db::one('SELECT * FROM pn_venv WHERE is_default = 1 ORDER BY id LIMIT 1');
         }
         if ($row) {
-            $bin = rtrim((string) $row['path'], '/') . '/bin/python';
-            if (!is_file($bin)) {
-                $bin = rtrim((string) $row['path'], '/') . '/bin/python3';
+            $base = rtrim((string) $row['path'], '/');
+            foreach (['/bin/python3', '/bin/python'] as $suffix) {
+                if (is_file($base . $suffix)) {
+                    return ['bin' => $base . $suffix, 'venv' => $base,
+                            'name' => (string) $row['name'], 'error' => null];
+                }
             }
-            return ['bin' => $bin, 'venv' => (string) $row['path'], 'name' => (string) $row['name']];
+            // Registered but the interpreter is gone (path typo, moved host,
+            // deleted venv). Say so instead of failing with a bare exit 127.
+            return [
+                'bin'   => (string) (self::cfg('python_bin') ?: 'python3'),
+                'venv'  => $base,
+                'name'  => (string) $row['name'],
+                'error' => sprintf("venv '%s' has no python at %s/bin/python3",
+                                   $row['name'], $base),
+            ];
         }
 
         $fallbackVenv = self::cfg('default_venv');
         if (is_string($fallbackVenv) && $fallbackVenv !== '') {
-            $bin = rtrim($fallbackVenv, '/') . '/bin/python';
-            return ['bin' => $bin, 'venv' => $fallbackVenv, 'name' => null];
+            $base = rtrim($fallbackVenv, '/');
+            if (is_file($base . '/bin/python') || is_file($base . '/bin/python3')) {
+                return ['bin' => $base . '/bin/python', 'venv' => $base,
+                        'name' => null, 'error' => null];
+            }
+            return [
+                'bin'   => (string) (self::cfg('python_bin') ?: 'python3'),
+                'venv'  => $base,
+                'name'  => null,
+                'error' => sprintf("default_venv '%s' has no python at %s/bin/python3",
+                                   $base, $base),
+            ];
         }
 
         return [
-            'bin'  => (string) (self::cfg('python_bin') ?: 'python3'),
-            'venv' => null,
-            'name' => null,
+            'bin'   => (string) (self::cfg('python_bin') ?: 'python3'),
+            'venv'  => null,
+            'name'  => null,
+            'error' => null,
         ];
     }
 

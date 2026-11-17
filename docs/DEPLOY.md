@@ -69,7 +69,9 @@ cPanel → **MySQL® Databases**:
 
    This creates the 8 `pn_*` tables and your admin account. (Optional flag:
    `--venv=reporting:/home/USER/virtualenv/pipnix/3.11` registers a venv in
-   the same step — you can also do it from the web console later.)
+   the same step — you can also do it from the web console later. **Replace
+   `USER` with your real cPanel username**; `install.php` refuses a path that
+   has no `bin/python3`, so a literal `/home/USER/...` cannot slip through.)
 
 ## Step 5 — Python environment
 

@@ -39,6 +39,15 @@ echo "schema: ok\n";
 if ($venv !== null) {
     [$name, $path] = array_pad(explode(':', $venv, 2), 2, '');
     if ($name !== '' && $path !== '') {
+        $path = rtrim($path, '/');
+        if (!is_file($path . '/bin/python3') && !is_file($path . '/bin/python')) {
+            fwrite(STDERR, "venv: no interpreter at {$path}/bin/python3\n"
+                . "  Create it first, e.g.:\n"
+                . "    python3.12 -m venv {$path}\n"
+                . "  (/home/USER in the docs is a placeholder — your home is "
+                . (getenv('HOME') ?: 'unknown') . ")\n");
+            exit(1);
+        }
         Db::run(
             'INSERT INTO pn_venv (name, path, is_default, status, created_at, updated_at)
              VALUES (?,?,1,"healthy",?,?)
