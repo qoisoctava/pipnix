@@ -119,7 +119,7 @@ That first line *is* the scheduler daemon. Nothing else runs continuously.
 | Symptom | Likely cause / fix |
 | --- | --- |
 | Blank page / 500 on first load | PHP < 8.1 on the domain (Step 2); check cPanel error log |
-| `cannot locate app/bootstrap.php` | Repo not at `~/pipnix`, or `public/` copy misplaced — set `PIPNIX_APP` in a `.htaccess`/`SetEnv` or move files |
+| `cannot locate app/bootstrap.php` | The console prints every path it checked. In the default layout (`~/pipnix/` + `public_html/pipnix/`) detection is automatic; if you renamed or moved the folder, add one line to the webroot's `.htaccess`: `SetEnv PIPNIX_APP /home/USER/pipnix/app` |
 | Heartbeat stale, runs never start | Cron line wrong PHP path, or cron disabled by hosting — test the command manually in Terminal |
 | `unknown venv` when triggering a DAG | Register the venv (Python page) and run **Check now**; the DAG's `venv` name must match |
 | `runner did not report` on every task | `proc_open`/`nohup` blocked by the host — ask support to allow it, or run tasks via `php app/ops.php tick` |

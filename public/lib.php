@@ -5,11 +5,23 @@
 declare(strict_types=1);
 
 // ---------------------------------------------------------------- app boot
-$appCandidates = array_filter([
-    getenv('PIPNIX_APP') ?: null,
-    dirname(__DIR__) . '/app',                 // repo layout: pipnix/public → pipnix/app
-    dirname(__DIR__, 3) . '/pipnix/app',       // cPanel: public_html/pipnix → /home/USER/pipnix/app
-]);
+// Where is app/? Checked in order:
+//   1. PIPNIX_APP env var (also readable from Apache `SetEnv` directives)
+//   2. an upward walk that covers every documented layout:
+//        pipnix/public/index.php          → pipnix/app        (repo / subdomain docroot)
+//        public_html/pipnix/index.php     → /home/USER/pipnix/app   (cPanel copy)
+//        public_html/index.php (public/* copied to the root) → /home/USER/pipnix/app
+$appEnv = getenv('PIPNIX_APP') ?: ($_SERVER['PIPNIX_APP'] ?? null);
+$appCandidates = [];
+if ($appEnv) {
+    $appCandidates[] = rtrim((string) $appEnv, '/');
+}
+for ($i = 1; $i <= 4; $i++) {
+    $up = dirname(__DIR__, $i);
+    $appCandidates[] = $up . '/app';         // repo layout / docroot = public/
+    $appCandidates[] = $up . '/pipnix/app';  // cPanel copy
+}
+$appCandidates = array_values(array_unique(array_filter($appCandidates)));
 $appDir = null;
 foreach ($appCandidates as $cand) {
     if (is_file($cand . '/bootstrap.php')) {
@@ -19,7 +31,12 @@ foreach ($appCandidates as $cand) {
 }
 if ($appDir === null) {
     http_response_code(500);
-    exit('pipnix: cannot locate app/bootstrap.php (set the PIPNIX_APP environment variable)');
+    echo 'pipnix: cannot locate app/bootstrap.php.' . "\n\n"
+        . "Checked:\n" . implode("\n", array_map('htmlspecialchars', $appCandidates)) . "\n\n"
+        . 'Fix: upload the app so /home/USER/pipnix/app/bootstrap.php exists, or set the '
+        . 'PIPNIX_APP environment variable to the absolute path of the app directory '
+        . "(e.g. 'SetEnv PIPNIX_APP /home/USER/pipnix/app' in the .htaccess).";
+    exit;
 }
 require_once $appDir . '/bootstrap.php';
 
