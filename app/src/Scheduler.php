@@ -51,6 +51,13 @@ final class Scheduler
                     continue;
                 }
             } else {
+                if (empty($dag['next_run_at'])) {
+                    $next = Cron::next((string) $dag['schedule'], $now);
+                    if ($next !== null) {
+                        Db::run('UPDATE pn_dag SET next_run_at = ? WHERE id = ?',
+                            [$next, $dag['id']]);
+                    }
+                }
                 if (!Cron::matches((string) $dag['schedule'], $now)) {
                     continue;
                 }
@@ -70,6 +77,10 @@ final class Scheduler
                 $next = $now->modify('+' . max(1, (int) $dag['schedule']) . ' minutes');
                 Db::run('UPDATE pn_dag SET next_run_at = ? WHERE id = ?',
                     [$next->format('Y-m-d H:i:s'), $dag['id']]);
+            } else {
+                $next = Cron::next((string) $dag['schedule'], $now);
+                Db::run('UPDATE pn_dag SET next_run_at = ? WHERE id = ?',
+                    [$next, $dag['id']]);
             }
         }
     }
