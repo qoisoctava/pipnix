@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 function handle_post(string $page, array $segments): void
 {
+    if ($page === 'account' && ($segments[1] ?? '') === 'password') {
+        post_account_password();
+        return;
+    }
     if ($page === 'dags') {
         $sub = $segments[1] ?? '';
         if ($sub === 'new') {
@@ -567,6 +571,10 @@ function post_user_new(): void
         flash('Password must be at least 8 characters.', 'bad');
         redirect('/admin');
     }
+    if (PasswordPolicy::isWeak($username, $password)) {
+        flash('That password is too weak — use at least 8 characters and not the username.', 'bad');
+        redirect('/admin');
+    }
     if (!in_array($role, ['admin', 'operator', 'viewer'], true)) {
         $role = 'viewer';
     }
@@ -611,15 +619,65 @@ function post_user_password(int $id): void
         redirect('/admin');
     }
     $password = (string) ($_POST['password'] ?? '');
-    if (strlen($password) < 8) {
-        flash('Password must be at least 8 characters.', 'bad');
+    $problem = PasswordPolicy::problem((string) $user['username'], $password);
+    if ($problem !== null) {
+        flash($problem, 'bad');
         redirect('/admin');
     }
-    Db::run('UPDATE pn_user SET password_hash = ? WHERE id = ?',
-        [password_hash($password, PASSWORD_DEFAULT), $id]);
+    // Resetting someone else's password hands out a temp secret → make them
+    // pick their own before they can use the console.
+    $force = $id === (int) (current_user()['id'] ?? 0) ? 0 : 1;
+    Db::run('UPDATE pn_user SET password_hash = ?, must_change_password = ? WHERE id = ?',
+        [password_hash($password, PASSWORD_DEFAULT), $force, $id]);
     audit('user.password_reset', (string) $user['username']);
-    flash('Password updated.');
+    flash($force === 1
+        ? 'Password updated — the user must choose a new one at next sign-in.'
+        : 'Password updated.');
     redirect('/admin');
+}
+
+/** Self-service change (also the forced first-login step). */
+function post_account_password(): void
+{
+    $user = current_user();
+    if (!$user) {
+        redirect('/login');
+    }
+    csrf_check();
+    $row = Db::one('SELECT * FROM pn_user WHERE id = ?', [(int) $user['id']]);
+    if (!$row) {
+        $_SESSION = [];
+        session_destroy();
+        redirect('/login');
+    }
+    $current = (string) ($_POST['current_password'] ?? '');
+    $new     = (string) ($_POST['new_password'] ?? '');
+    $confirm = (string) ($_POST['confirm_password'] ?? '');
+
+    if (!password_verify($current, (string) $row['password_hash'])) {
+        flash('Current password is not correct.', 'bad');
+        redirect('/account/password');
+    }
+    if ($new !== $confirm) {
+        flash('The new passwords do not match.', 'bad');
+        redirect('/account/password');
+    }
+    if (password_verify($new, (string) $row['password_hash'])) {
+        flash('The new password must differ from the current one.', 'bad');
+        redirect('/account/password');
+    }
+    $problem = PasswordPolicy::problem((string) $row['username'], $new);
+    if ($problem !== null) {
+        flash($problem, 'bad');
+        redirect('/account/password');
+    }
+
+    Db::run('UPDATE pn_user SET password_hash = ?, must_change_password = 0 WHERE id = ?',
+        [password_hash($new, PASSWORD_DEFAULT), (int) $row['id']]);
+    $_SESSION['user']['must_change_password'] = 0;
+    audit('user.password_changed', (string) $row['username']);
+    flash('Password updated.');
+    redirect('/');
 }
 
 // ================================================================== pages

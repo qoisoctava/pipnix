@@ -1,4 +1,4 @@
-.PHONY: unit e2e ui ui-actions check tick clean-test dist
+.PHONY: unit e2e ui ui-actions pass-change check tick clean-test dist
 
 unit:            ## cron/logger unit tests (no DB)
 	php tests/php/cron_test.php
@@ -15,6 +15,9 @@ ui:              ## web console smoke test (auth + every page)
 
 ui-actions:      ## web console write-action tests (editor, import, trigger, venv, users)
 	bash tests/ui_actions.sh
+
+pass-change:     ## forced password change on weak install passwords
+	bash tests/pass_change.sh
 
 tick:            ## one scheduler tick
 	php app/scheduler.php

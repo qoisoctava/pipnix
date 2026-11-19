@@ -80,7 +80,18 @@ p { margin: 8px 0; }
 .nav-user .label {
   max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.nav-user:hover { color: var(--text); }
 .nav-bottom button.nav-item:hover { color: var(--warn); }
+
+/* ---------------------------------------------------------------- account */
+.pwd-form { display: flex; flex-direction: column; gap: 16px; }
+.pwd-form label { color: var(--label); font-size: 12px; }
+.pwd-form input {
+  width: 100%; height: 40px; padding: 0 12px; border-radius: 8px;
+  background: var(--input); border: 1px solid var(--border);
+  color: var(--text); outline: 0; font: inherit;
+}
+.pwd-form input:focus { border-color: var(--link); box-shadow: 0 0 0 1px var(--link); }
 
 .content { flex: 1; min-width: 0; padding: 28px 40px 48px; max-width: 1440px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }

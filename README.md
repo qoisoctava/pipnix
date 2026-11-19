@@ -193,6 +193,7 @@ make check                    # PHP lint + cron/logger unit tests (no DB)
 PN_MYSQL_PORT=3307 make e2e   # full integration test against a dev MySQL
 PN_MYSQL_PORT=3307 make ui    # web console smoke test (auth + every page)
 PN_MYSQL_PORT=3307 make ui-actions  # write-action tests (editor, import, trigger, venv, users)
+PN_MYSQL_PORT=3307 make pass-change   # weak install password → forced change flow
 ```
 
 The e2e suite provisions a real venv and database, then verifies: schema install,

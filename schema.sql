@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS pn_user (
   password_hash VARCHAR(255) NOT NULL,
   role          ENUM('admin','operator','viewer') NOT NULL DEFAULT 'viewer',
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   last_login_at DATETIME     NULL,
   created_at    DATETIME     NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

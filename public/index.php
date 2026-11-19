@@ -62,6 +62,14 @@ if ($method === 'POST' && $page === 'logout') {
 
 require_login();
 
+// ---------------------------------------------------- forced password change
+$me = current_user();
+if ((int) ($me['must_change_password'] ?? 0) === 1
+    && !($page === 'account' && ($segments[1] ?? '') === 'password')) {
+    flash('Choose a new password before continuing.', 'bad');
+    redirect('/account/password');
+}
+
 // ------------------------------------------------------------------ write actions
 if ($method === 'POST') {
     handle_post($page, $segments);
@@ -112,6 +120,15 @@ switch ($page) {
         }
         python_page($segments[1] ?? null);
         return;
+    case 'account':
+        if (($segments[1] ?? '') === 'password') {
+            account_password_page();
+            return;
+        }
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Page not found',
+            'message' => 'That page does not exist in the console.'], 'bare');
+        return;
     case 'admin':
         require_role('admin');
         if (($segments[1] ?? '') === 'audit') {
@@ -155,9 +172,14 @@ function handle_login(): void
         'id'       => (int) $user['id'],
         'username' => (string) $user['username'],
         'role'     => (string) $user['role'],
+        'must_change_password' => (int) ($user['must_change_password'] ?? 0),
     ];
     unset($_SESSION['login_fails']);
     Db::run('UPDATE pn_user SET last_login_at = ? WHERE id = ?', [Env::now(), $user['id']]);
+    if ((int) ($user['must_change_password'] ?? 0) === 1) {
+        flash('This account still uses a temporary password — set a new one to continue.', 'bad');
+        redirect('/account/password');
+    }
     redirect('/');
 }
 
@@ -474,6 +496,16 @@ function python_page(?string $name): void
         'venvs' => $venvs,
         'selected' => $selected,
         'packages' => $packages,
+    ]);
+}
+
+// ================================================================== account
+function account_password_page(): void
+{
+    render('account_password', [
+        'title' => 'Change password',
+        'nav'   => '',
+        'user'  => current_user(),
     ]);
 }
 

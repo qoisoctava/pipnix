@@ -73,6 +73,11 @@ cPanel → **MySQL® Databases**:
    `USER` with your real cPanel username**; `install.php` refuses a path that
    has no `bin/python3`, so a literal `/home/USER/...` cannot slip through.)
 
+   A weak password (equal to the username, or a common default like `admin`)
+   is accepted too — the account is flagged and the console refuses to show
+   anything until you set a new one right after the first sign-in. Re-running
+   `install.php` with a strong password is the reset path if you get locked out.
+
 ## Step 5 — Python environment
 
 cPanel → **Setup Python App**:
@@ -133,6 +138,7 @@ That first line *is* the scheduler daemon. Nothing else runs continuously.
 
 - [ ] `app/config.php` exists **only** under `~/pipnix/app/` (never in `public_html`).
 - [ ] Admin password is long and unique (it executes DAG code — treat it like shell access).
+- [ ] No account still says "Set a new password" (a temporary password is pending).
 - [ ] Only `public/` contents live in `public_html`; `.htaccess` is present.
 - [ ] HTTPS enforced (cPanel → Domains → *Force HTTPS Redirect*).
 - [ ] `PIPNIX_UI_DEV` is **not** set anywhere on the server.

@@ -69,7 +69,7 @@ return [
     'alerts' => ['enabled' => false],
 ];
 PHP
-php app/install.php --admin=admin:secret --venv=reporting:"$VENV" >/dev/null
+php app/install.php --admin=admin:Test-Pass-1 --venv=reporting:"$VENV" >/dev/null
 cat > jobs/act_demo.py <<'PY'
 import time
 
@@ -93,7 +93,7 @@ SERVER_PID=$!
 for _ in $(seq 1 30); do curl -s -o /dev/null "$BASE/login" && break; sleep 0.3; done
 LOGIN=$(curl -s -c "$JAR" "$BASE/login")
 TOKEN=$(sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)".*/\1/p' <<<"$LOGIN" | head -1)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -d "_csrf=$TOKEN&username=admin&password=secret" "$BASE/login"
+curl -s -o /dev/null -b "$JAR" -c "$JAR" -d "_csrf=$TOKEN&username=admin&password=Test-Pass-1" "$BASE/login"
 HOME_HTML=$(curl -s -b "$JAR" -c "$JAR" "$BASE/")
 grep -q "Failed Dags" <<<"$HOME_HTML" || fail "login failed"
 TOKEN=$(sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)".*/\1/p' <<<"$HOME_HTML" | head -1)

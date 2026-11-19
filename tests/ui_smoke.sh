@@ -63,7 +63,7 @@ return [
     'alerts' => ['enabled' => false],
 ];
 PHP
-php app/install.php --admin=admin:secret --venv=reporting:"$VENV" >/dev/null
+php app/install.php --admin=admin:Test-Pass-1 --venv=reporting:"$VENV" >/dev/null
 php app/ops.php venv:check --name=reporting >/dev/null || true
 
 cat > jobs/ui_demo.py <<'PY'
@@ -129,7 +129,7 @@ grep -q "Invalid username or password" <<<"$BAD" || fail "wrong password not rej
 ok "wrong password rejected"
 
 curl -s -o /dev/null -b "$JAR" -c "$JAR" \
-  -d "_csrf=$TOKEN&username=admin&password=secret" "$BASE/login"
+  -d "_csrf=$TOKEN&username=admin&password=Test-Pass-1" "$BASE/login"
 [[ "$(code /)" == "200" ]] || fail "login did not establish a session"
 ok "login works"
 

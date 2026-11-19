@@ -59,7 +59,7 @@ return [
     'alerts' => ['enabled' => false],
 ];
 PHP
-php app/install.php --admin=admin:secret --venv=e2e:"$VENV" || fail "install.php failed"
+php app/install.php --admin=admin:Test-Pass-1 --venv=e2e:"$VENV" || fail "install.php failed"
 ok "schema + admin + venv registered"
 
 say "4. venv inventory"

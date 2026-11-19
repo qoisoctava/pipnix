@@ -4,6 +4,10 @@
  * pipnix installer — creates the schema and the first admin user.
  *
  *   php app/install.php --admin=you:secret [--venv=reporting:/home/USER/venvs/reporting]
+ *
+ * A weak password (same as the username, or a common default such as "admin")
+ * is accepted but the account is flagged must_change_password: the console
+ * asks for a new password right after the first sign-in.
  */
 declare(strict_types=1);
 
@@ -36,6 +40,16 @@ foreach ($statements as $sql) {
 }
 echo "schema: ok\n";
 
+// Schema upgrades for installs created before a column existed.
+$has = Db::one(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pn_user'
+        AND COLUMN_NAME = 'must_change_password'");
+if ((int) ($has['n'] ?? 0) === 0) {
+    Db::run('ALTER TABLE pn_user ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active');
+    echo "migration: pn_user.must_change_password\n";
+}
+
 if ($venv !== null) {
     [$name, $path] = array_pad(explode(':', $venv, 2), 2, '');
     if ($name !== '' && $path !== '') {
@@ -61,13 +75,19 @@ if ($venv !== null) {
 if ($admin !== null) {
     [$user, $pass] = array_pad(explode(':', $admin, 2), 2, '');
     if ($user !== '' && $pass !== '') {
+        $force = PasswordPolicy::isWeak($user, $pass) ? 1 : 0;
         Db::run(
-            'INSERT INTO pn_user (username, password_hash, role, is_active, created_at)
-             VALUES (?, ?, "admin", 1, ?)
-             ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash)',
-            [$user, password_hash($pass, PASSWORD_DEFAULT), Env::now()]
+            'INSERT INTO pn_user (username, password_hash, role, is_active,
+                                  must_change_password, created_at)
+             VALUES (?, ?, "admin", 1, ?, ?)
+             ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash),
+                                     must_change_password = VALUES(must_change_password)',
+            [$user, password_hash($pass, PASSWORD_DEFAULT), $force, Env::now()]
         );
         echo "admin: {$user}\n";
+        if ($force === 1) {
+            echo "  weak password — the console will ask for a new one at first sign-in\n";
+        }
     }
 }
 
