@@ -63,19 +63,18 @@ $statusClass = static fn (string $s): string => match ($s) {
       <div>
         <label for="c-python">Interpreter</label>
         <input id="c-python" name="python" class="mono" value="<?= e((string) Env::cfg('python_bin', 'python3')) ?>">
-        <p class="hint">binary used to create the venv</p>
       </div>
       <div>
         <label>&nbsp;</label>
         <button class="btn btn-primary" type="submit">Create</button>
       </div>
     </form>
+    <p class="hint" style="margin-top:2px">Interpreter is the binary used to create the venv.</p>
   </section>
   <?php endif; ?>
   <div class="stack">
     <?php foreach ($venvs as $v): ?>
-      <section class="card">
-        <div class="row-between">
+      <section class="card">        <div class="row-between">
           <div class="dag-title">
             <a class="link mono" href="<?= url('/python/' . rawurlencode($v['name'])) ?>"><?= e($v['name']) ?></a>
             <?php if ((int) $v['is_default'] === 1): ?><span class="badge primary">default</span><?php endif; ?>
@@ -171,4 +170,4 @@ $statusClass = static fn (string $s): string => match ($s) {
   </section>
 <?php endif; ?>
 
-<p class="muted small">Installs, upgrades and requirements files stream into the pip log (refreshed automatically). The same actions exist on the CLI: <code class="mono">php app/ops.php venv:install|upgrade|requirements</code>.</p>
+<p class="muted small footer-note">Installs, upgrades and requirements files stream into the pip log (refreshed automatically). The same actions exist on the CLI: <code class="mono">php app/ops.php venv:install|upgrade|requirements</code>.</p>
