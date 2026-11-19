@@ -87,8 +87,9 @@ docker compose up -d --build
 
 Your pipelines live in `./dags` and `./jobs` (bind-mounted); the database,
 logs, storage and Python venvs live in named volumes and survive rebuilds.
-On first boot a strong admin password is generated and printed once in
-`docker compose logs app` — or set `PIPNIX_ADMIN_PASS` yourself.
+The first boot creates `admin:admin` — the usual convention — and the console
+forces a new password before anything else. Set `PIPNIX_ADMIN_PASS` to start
+with a different temporary password.
 
 ```bash
 make docker-up        # docker compose up -d --build

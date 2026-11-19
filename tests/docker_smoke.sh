@@ -5,9 +5,9 @@
 #   tests/docker_smoke.sh [--keep]
 #
 # Requires a running Docker daemon. Builds the image, boots a fresh compose
-# project (own database + volumes), checks that the first admin password is
-# generated and printed, signs in, loads and runs a DAG, and verifies the
-# per-attempt log. Everything is removed afterwards unless --keep is given.
+# project (own database + volumes), checks the admin:admin convention and the
+# forced password change, loads and runs a DAG, and verifies the per-attempt
+# log. Everything is removed afterwards unless --keep is given.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +33,7 @@ export PIPNIX_DB_USER=pipnix
 export PIPNIX_DB_PASS=smoke-db-pass
 export PIPNIX_DB_ROOT_PASS=smoke-root-pass
 export PIPNIX_ADMIN_USER=admin
-export PIPNIX_ADMIN_PASS=          # exercise the generated-password path
+export PIPNIX_ADMIN_PASS=          # exercise the admin:admin default
 export PIPNIX_TIMEZONE=UTC
 
 cleanup() {
@@ -61,16 +61,23 @@ dc logs app 2>/dev/null | grep -q 'starting Apache' || {
 }
 ok "container booted"
 
-say "2. first admin password was generated and printed once"
-PASS=$(dc logs app 2>/dev/null | sed -n 's/^.*\[pipnix\]     password: \(.*\)$/\1/p' | head -1)
-[[ -n "$PASS" ]] || fail "no generated password in the logs"
+say "2. the first admin is admin:admin and is flagged as temporary"
 [[ "$(dc exec -T app stat -c '%a' app/config.php)" == "640" ]] \
   || fail "app/config.php should be 0640"
 [[ "$(dc exec -T app stat -c '%U' app/config.php)" == "www-data" ]] \
   || fail "app/config.php should belong to www-data"
-ok "generated admin password found; config.php is 0640 www-data"
+FOUND=0
+for _ in $(seq 1 15); do
+  if dc logs app 2>/dev/null | grep -q "temporary password 'admin'"; then
+    FOUND=1
+    break
+  fi
+  sleep 2
+done
+[[ "$FOUND" = "1" ]] || fail "the boot log does not mention the temporary admin password"
+ok "admin:admin created as a temporary password; config.php is 0640 www-data"
 
-say "3. web console is up and the password works"
+say "3. the console blocks everything until the password changes"
 for _ in $(seq 1 60); do
   [[ "$(curl -s -o /dev/null -w '%{http_code}' "$B/login" || true)" == "200" ]] && break
   sleep 2
@@ -78,15 +85,36 @@ done
 rm -f "$JAR"
 T=$(curl -s -c "$JAR" "$B/login" | sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)".*/\1/p' | head -1)
 LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" \
-  -d "_csrf=$T&username=admin&password=$PASS" "$B/login")
-[[ "$LOC" == "$B/" ]] || fail "login did not redirect to the dashboard (got '$LOC')"
+  -d "_csrf=$T&username=admin&password=admin" "$B/login")
+[[ "$LOC" == "$B/account/password" ]] || fail "login with admin:admin went to '$LOC'"
+for PAGE in / /dags /runs /logs /python /admin; do
+  LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" "$B$PAGE")
+  [[ "$LOC" == *"/account/password" ]] || fail "$PAGE was not blocked (got '$LOC')"
+done
+
+T=$(curl -s -b "$JAR" -c "$JAR" "$B/account/password" \
+  | sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)".*/\1/p' | head -1)
+LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" \
+  -d "_csrf=$T&current_password=admin&new_password=Good-Pass-1&confirm_password=Good-Pass-1" \
+  "$B/account/password")
+[[ "$LOC" == "$B/" ]] || fail "password change did not land on the dashboard (got '$LOC')"
+[[ "$(dc exec -T app php -r 'require "app/bootstrap.php"; echo (int) Db::one("SELECT must_change_password AS f FROM pn_user WHERE username = \"admin\"")["f"];')" == "0" ]] \
+  || fail "must_change_password was not cleared"
+ok "weak password blocked everywhere, then replaced"
+
+say "4. web console pages are reachable after the change"
+rm -f "$JAR"
+T=$(curl -s -c "$JAR" "$B/login" | sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)".*/\1/p' | head -1)
+LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" \
+  -d "_csrf=$T&username=admin&password=Good-Pass-1" "$B/login")
+[[ "$LOC" == "$B/" ]] || fail "login with the new password failed (got '$LOC')"
 for PAGE in / /dags /runs /logs /python /admin /docs/dags; do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$B$PAGE")
   [[ "$CODE" == "200" ]] || fail "$PAGE returned $CODE"
 done
 ok "login + every page"
 
-say "4. the scheduler tick loads DAGs (supercronic, every minute)"
+say "5. the scheduler tick loads DAGs (supercronic, every minute)"
 cat > "$DAG_FILE" <<'PY'
 DAG = {
     "name": "docker_smoke",
@@ -102,7 +130,7 @@ dc exec -T -u www-data app php app/ops.php dags | grep -q docker_smoke \
   || fail "docker_smoke was not loaded"
 ok "DAG loaded in the container"
 
-say "5. trigger → dispatch → success"
+say "6. trigger → dispatch → success"
 dc exec -T -u www-data app php app/ops.php trigger --dag=docker_smoke >/dev/null
 STATE=""
 for _ in $(seq 1 30); do
@@ -115,7 +143,7 @@ done
 [[ "$STATE" == "success" ]] || fail "the run ended as '$STATE'"
 ok "run succeeded"
 
-say "6. per-attempt logs were written by www-data"
+say "7. per-attempt logs were written by www-data"
 dc exec -T -u www-data app sh -c \
   "grep -rq 'docker smoke ok' logs/runs" || fail "task output not found in logs/runs"
 ok "task output is in logs/runs"

@@ -12,7 +12,7 @@ set -Eeuo pipefail
 
 APP_DIR="${PIPNIX_APP_DIR:-/var/www/pipnix}"
 ADMIN_USER="${PIPNIX_ADMIN_USER:-admin}"
-ADMIN_PASS="${PIPNIX_ADMIN_PASS:-}"
+ADMIN_PASS="${PIPNIX_ADMIN_PASS:-admin}"
 DB_WAIT="${PIPNIX_DB_WAIT:-90}"
 
 log() { printf '[pipnix] %s\n' "$*"; }
@@ -50,17 +50,13 @@ log "schema: ok"
 
 USERS=$(php -r 'require "app/bootstrap.php"; echo (int) Db::one("SELECT COUNT(*) AS n FROM pn_user")["n"];')
 if [ "$USERS" = "0" ]; then
-    GENERATED=0
-    if [ -z "$ADMIN_PASS" ]; then
-        ADMIN_PASS=$(php -r 'echo bin2hex(random_bytes(9));')
-        GENERATED=1
-    fi
     php app/install.php --admin="${ADMIN_USER}:${ADMIN_PASS}" >/dev/null
-    if [ "$GENERATED" = "1" ]; then
-        log "created the first admin account (shown only once):"
-        log "    username: ${ADMIN_USER}"
-        log "    password: ${ADMIN_PASS}"
-        log "  set PIPNIX_ADMIN_PASS in .env to pick it yourself"
+    FORCED=$(php -r 'require "app/bootstrap.php"; $u = Db::one("SELECT must_change_password AS f FROM pn_user WHERE username = ?", [getenv("PIPNIX_ADMIN_USER") ?: "admin"]); echo (int) ($u["f"] ?? 0);')
+    if [ "$FORCED" = "1" ]; then
+        # admin:admin and other weak passwords are the documented convenience
+        # path: the console refuses everything until a new one is chosen.
+        log "created the first admin account '${ADMIN_USER}' with the temporary password '${ADMIN_PASS}'"
+        log "  the console asks for a new password before anything else"
     else
         log "created the first admin account '${ADMIN_USER}'"
     fi

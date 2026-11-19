@@ -28,19 +28,15 @@ cp .env.example .env        # set database/admin secrets and the port
 docker compose up -d --build
 ```
 
-Open <http://localhost:8080>.
+Open <http://localhost:8080> and sign in with **`admin` / `admin`**. That is a
+weak password on purpose (the usual convention), so the console asks for a new
+one immediately — the stored hash is replaced before any other page opens.
 
-The first boot prints the admin password **once** if `PIPNIX_ADMIN_PASS` is
-empty:
-
-```bash
-docker compose logs app | grep -A2 'first admin account'
-```
-
-Set `PIPNIX_ADMIN_PASS` in `.env` before the first start to choose it
-yourself. A weak password (equal to the username, a common default, or
-shorter than 8 characters) is accepted but the console forces a change at the
-first sign-in.
+If you prefer to start with a different temporary password, set
+`PIPNIX_ADMIN_PASS` in `.env` before the first start; a strong one skips the
+forced change. Changing that variable later does not reset an existing account
+(use `docker compose exec -T -u www-data app php app/install.php --admin=you:secret`
+for a reset).
 
 ```
 docker compose ps          # both services should be "healthy"
@@ -162,7 +158,7 @@ file inside the container — change `.env` and recreate the container.
 | `PIPNIX_DB_NAME` / `PIPNIX_DB_USER` / `PIPNIX_DB_PASS` | `pipnix` | application database |
 | `PIPNIX_DB_ROOT_PASS` | `pipnix-root` | MySQL root password (compose only) |
 | `PIPNIX_ADMIN_USER` | `admin` | first admin username |
-| `PIPNIX_ADMIN_PASS` | *(generated)* | first admin password, printed once when empty |
+| `PIPNIX_ADMIN_PASS` | `admin` | first admin password; weak values force a change at first sign-in |
 | `PIPNIX_ALERTS_ENABLED` | `0` | enable `mail()` alerts |
 | `PIPNIX_ALERTS_FROM` / `PIPNIX_ALERTS_TO` | — | alert sender / comma-separated recipients |
 | `PIPNIX_MAX_LAUNCHES` | `4` | task launches per tick (`tick.max_launches_per_tick`) |
@@ -226,7 +222,7 @@ docker compose exec -T app php -r \
 | --- | --- |
 | Container restarts in a loop | `docker compose logs app` — usually wrong DB password in `.env` |
 | `database: not reachable after 90s` | `db` is still initializing; raise `PIPNIX_DB_WAIT` |
-| Login rejected | password was generated: `docker compose logs app \| grep password:` |
+| Login rejected | wrong password; the first boot account is `admin:admin` and must be changed on first sign-in |
 | Console asks to set a new password | the account was created with a weak `PIPNIX_ADMIN_PASS` — intended |
 | 500 on every page | `docker compose exec app php -l` the file, or check `docker compose logs app` |
 | DAG never runs | Dags → check **Active**, then Health → Scheduler; inspect `docker compose logs app` for tick lines |

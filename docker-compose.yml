@@ -57,8 +57,8 @@ services:
       TZ: ${PIPNIX_TIMEZONE:-UTC}
 
       PIPNIX_ADMIN_USER: ${PIPNIX_ADMIN_USER:-admin}
-      # Empty → a random password is generated and printed once in the logs.
-      PIPNIX_ADMIN_PASS: ${PIPNIX_ADMIN_PASS:-}
+      # Defaults to admin:admin; weak passwords must be changed at first login.
+      PIPNIX_ADMIN_PASS: ${PIPNIX_ADMIN_PASS:-admin}
 
       PIPNIX_ALERTS_ENABLED: ${PIPNIX_ALERTS_ENABLED:-0}
       PIPNIX_ALERTS_FROM: ${PIPNIX_ALERTS_FROM:-pipnix@example.com}
