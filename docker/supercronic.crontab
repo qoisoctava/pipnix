@@ -1,0 +1,11 @@
+# pipnix scheduler — supercronic reads this file and runs it as www-data.
+# supercronic logs every tick to the container's stdout, so `docker compose
+# logs -f app` is the scheduler log.
+
+# One tick per minute. The MySQL GET_LOCK in Scheduler::tick makes overlapping
+# ticks safe, so a slow tick can never run the same task twice.
+* * * * * /usr/local/bin/php /var/www/pipnix/app/scheduler.php
+
+# Housekeeping: drop finished runs and their per-attempt logs after 30 days.
+# (Audit rows are kept.) Comment this out if you prune some other way.
+15 4 * * 0 /usr/local/bin/php /var/www/pipnix/app/ops.php prune --days=30

@@ -74,6 +74,31 @@ Cron (one line, every minute):
 Requirements: PHP 8.1+ CLI (`proc_open` allowed), MySQL 5.7+/MariaDB 10.3+,
 Python 3.8+ with a venv (cPanel → *Setup Python App*).
 
+## Run with Docker
+
+One container carries the web console, the PHP CLI, Python 3 and the
+one-minute scheduler (supercronic); compose adds MySQL:
+
+```bash
+cp .env.example .env            # database + admin secrets, host port
+docker compose up -d --build
+# → http://localhost:8080
+```
+
+Your pipelines live in `./dags` and `./jobs` (bind-mounted); the database,
+logs, storage and Python venvs live in named volumes and survive rebuilds.
+On first boot a strong admin password is generated and printed once in
+`docker compose logs app` — or set `PIPNIX_ADMIN_PASS` yourself.
+
+```bash
+make docker-up        # docker compose up -d --build
+make docker-logs      # follow Apache + scheduler output
+make docker-down      # stop, keep data
+```
+
+📖 **Full guide: [docs/DOCKER.md](docs/DOCKER.md)** — upgrades, backups,
+Python packages, reverse proxy/TLS, alerts and troubleshooting.
+
 ## DAG format
 
 ```python
@@ -194,6 +219,7 @@ PN_MYSQL_PORT=3307 make e2e   # full integration test against a dev MySQL
 PN_MYSQL_PORT=3307 make ui    # web console smoke test (auth + every page)
 PN_MYSQL_PORT=3307 make ui-actions  # write-action tests (editor, import, trigger, venv, users)
 PN_MYSQL_PORT=3307 make pass-change   # weak install password → forced change flow
+make docker-smoke                    # Docker stack: boot, login, run a DAG (needs Docker)
 ```
 
 The e2e suite provisions a real venv and database, then verifies: schema install,
@@ -212,8 +238,9 @@ lib/                  dag_loader.py + runner.py (stdlib only)
 public/               web console (index.php + views/ + assets/)
 dags/ · jobs/         DAG definitions and task code
 tests/                unit tests (php/) + e2e harness
-docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md
+docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md, DOCKER.md
 dags/examples/        copy-paste DAG patterns (not auto-loaded)
+docker/ · docker-compose.yml   single-container + MySQL deployment
 schema.sql · Makefile · README.md
 ```
 

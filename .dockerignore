@@ -1,0 +1,25 @@
+# Build context exclusions
+.git
+.github
+.gitattributes
+dist
+*.zip
+*.tar.gz
+.env
+.env.*
+!.env.example
+
+# never bake local secrets or runtime state into the image
+app/config.php
+logs/*
+storage/*
+**/__pycache__
+**/*.py[cod]
+**/.venv
+
+# local tooling
+tests
+.DS_Store
+._*
+.idea
+.vscode

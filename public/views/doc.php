@@ -5,6 +5,7 @@
     <div class="chips">
       <a class="chip <?= $slug === '' ? 'on' : '' ?>" href="<?= url('/docs') ?>">Deploy to cPanel</a>
       <a class="chip <?= $slug === 'dags' ? 'on' : '' ?>" href="<?= url('/docs/dags') ?>">Writing DAGs</a>
+      <a class="chip <?= $slug === 'docker' ? 'on' : '' ?>" href="<?= url('/docs/docker') ?>">Running with Docker</a>
     </div>
   </div>
 </header>

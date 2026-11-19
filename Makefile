@@ -1,4 +1,5 @@
-.PHONY: unit e2e ui ui-actions pass-change check tick clean-test dist
+.PHONY: unit e2e ui ui-actions pass-change check tick clean-test dist \
+        docker-up docker-down docker-logs docker-smoke
 
 unit:            ## cron/logger unit tests (no DB)
 	php tests/php/cron_test.php
@@ -31,3 +32,15 @@ dist:            ## build a release zip from the tracked files (dist/pipnix-v<ve
 	V=$$(grep -o "PN_VERSION', '[^']*" app/bootstrap.php | cut -d"'" -f3) && \
 	git archive --format=zip --prefix="pipnix/" -o "dist/pipnix-v$$V.zip" HEAD && \
 	echo "built dist/pipnix-v$$V.zip"
+
+docker-up:       ## boot the Docker stack (app + MySQL) on http://localhost:8080
+	docker compose up -d --build
+
+docker-down:     ## stop the Docker stack (keeps volumes)
+	docker compose down
+
+docker-logs:     ## follow the app + scheduler logs
+	docker compose logs -f app
+
+docker-smoke:    ## full Docker end-to-end test (fresh project, removed afterwards)
+	bash tests/docker_smoke.sh

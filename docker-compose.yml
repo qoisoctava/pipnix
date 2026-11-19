@@ -1,0 +1,86 @@
+# pipnix — single app container + MySQL.
+#
+#   cp .env.example .env      # pick secrets / port
+#   docker compose up -d --build
+#   open http://localhost:8080
+#
+# See docs/DOCKER.md for upgrades, backups and troubleshooting.
+
+name: pipnix
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${PIPNIX_DB_NAME:-pipnix}
+      MYSQL_USER: ${PIPNIX_DB_USER:-pipnix}
+      MYSQL_PASSWORD: ${PIPNIX_DB_PASS:-pipnix}
+      MYSQL_ROOT_PASSWORD: ${PIPNIX_DB_ROOT_PASS:-pipnix-root}
+      TZ: ${PIPNIX_TIMEZONE:-UTC}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --silent -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    # Uncomment to reach MySQL from the host (e.g. a desktop client):
+    # ports:
+    #   - "127.0.0.1:3307:3306"
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: pipnix:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PIPNIX_PORT:-8080}:80"
+    stop_grace_period: 30s
+    environment:
+      PIPNIX_DB_HOST: db
+      PIPNIX_DB_PORT: "3306"
+      PIPNIX_DB_NAME: ${PIPNIX_DB_NAME:-pipnix}
+      PIPNIX_DB_USER: ${PIPNIX_DB_USER:-pipnix}
+      PIPNIX_DB_PASS: ${PIPNIX_DB_PASS:-pipnix}
+      PIPNIX_DB_WAIT: ${PIPNIX_DB_WAIT:-90}
+
+      PIPNIX_TIMEZONE: ${PIPNIX_TIMEZONE:-UTC}
+      TZ: ${PIPNIX_TIMEZONE:-UTC}
+
+      PIPNIX_ADMIN_USER: ${PIPNIX_ADMIN_USER:-admin}
+      # Empty → a random password is generated and printed once in the logs.
+      PIPNIX_ADMIN_PASS: ${PIPNIX_ADMIN_PASS:-}
+
+      PIPNIX_ALERTS_ENABLED: ${PIPNIX_ALERTS_ENABLED:-0}
+      PIPNIX_ALERTS_FROM: ${PIPNIX_ALERTS_FROM:-pipnix@example.com}
+      PIPNIX_ALERTS_TO: ${PIPNIX_ALERTS_TO:-}
+
+      # Match the host user on Linux so DAGs written by the web editor are
+      # editable outside the container: PIPNIX_UID=$(id -u) PIPNIX_GID=$(id -g)
+      PIPNIX_UID: ${PIPNIX_UID:-}
+      PIPNIX_GID: ${PIPNIX_GID:-}
+    volumes:
+      # Your pipelines: edit here or through the console, both work.
+      - ./dags:/var/www/pipnix/dags
+      - ./jobs:/var/www/pipnix/jobs
+      # Internal state survives rebuilds.
+      - pipnix_logs:/var/www/pipnix/logs
+      - pipnix_storage:/var/www/pipnix/storage
+      - pipnix_venvs:/venvs
+      # Bring your own config instead of the generated one:
+      # - ./app/config.php:/var/www/pipnix/app/config.php:ro
+
+volumes:
+  db_data:
+  pipnix_logs:
+  pipnix_storage:
+  pipnix_venvs:

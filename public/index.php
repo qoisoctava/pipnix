@@ -445,11 +445,12 @@ function docs_page(string $slug): void
         ''        => ['Deploying to cPanel', 'deploy'],
         'deploy'  => ['Deploying to cPanel', 'deploy'],
         'dags'    => ['Writing DAGs', 'DAGS'],
+        'docker'  => ['Running with Docker', 'DOCKER'],
     ];
     if (!isset($docs[$slug])) {
         http_response_code(404);
         render('error', ['code' => 404, 'title' => 'Doc not found',
-            'message' => 'Available docs: deploy, dags.'], 'bare');
+            'message' => 'Available docs: deploy, dags, docker.'], 'bare');
         return;
     }
     [$title, $file] = $docs[$slug];
