@@ -74,6 +74,9 @@ Cron (one line, every minute):
 Requirements: PHP 8.1+ CLI (`proc_open` allowed), MySQL 5.7+/MariaDB 10.3+,
 Python 3.8+ with a venv (cPanel → *Setup Python App*).
 
+**Complete installation-to-update manual:** [docs/GUIDE.md](docs/GUIDE.md),
+also available in the console at **Docs → Getting started** (`/docs`).
+
 ## Run with Docker
 
 One container carries the web console, the PHP CLI, Python 3 and the
@@ -117,6 +120,11 @@ php app/ops.php update:rollback
 
 📖 **Guide: [docs/UPDATE.md](docs/UPDATE.md)** — channels, tokens for private
 forks, permissions, Docker behaviour and troubleshooting.
+
+**cPanel note:** the standard deployment copies `public/` into
+`public_html/pipnix/`. The built-in updater does not yet synchronize that
+separate webroot; follow the manual copy step in [docs/UPDATE.md](docs/UPDATE.md)
+after updating, or point the document root directly at `pipnix/public/`.
 
 ## DAG format
 
@@ -263,7 +271,7 @@ lib/                  dag_loader.py + runner.py (stdlib only)
 public/               web console (index.php + views/ + assets/)
 dags/ · jobs/         DAG definitions and task code
 tests/                unit tests (php/) + e2e harness
-docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md, DOCKER.md, UPDATE.md
+docs/                 GUIDE.md, DEPLOY.md, DAGS.md, DOCKER.md, UPDATE.md, assets/screenshots
 dags/examples/        copy-paste DAG patterns (not auto-loaded)
 docker/ · docker-compose.yml   single-container + MySQL deployment
 schema.sql · Makefile · README.md

@@ -199,7 +199,10 @@ grep -q "ui_flow" <<<"$LOGIDX" || fail "logs index missing recent task"
 ok "logs index (nav landing)"
 
 DOCS=$(get /docs)
-grep -q "Deploying to cPanel" <<<"$DOCS" || fail "docs page missing"
+grep -q "Panduan Lengkap\|Persyaratan" <<<"$DOCS" || fail "getting started guide missing"
+grep -q "Instalasi\|Docker Compose" <<<"$DOCS" || fail "guide missing install paths"
+DOCS_CP=$(get /docs/cpanel)
+grep -q "Deploying to cPanel" <<<"$DOCS_CP" || fail "cPanel guide missing"
 DOCS2=$(get /docs/dags)
 grep -q "Writing DAGs\|DAG-level keys\|Task-level keys" <<<"$DOCS2" || fail "dags doc missing"
 DOCS3=$(get /docs/docker)

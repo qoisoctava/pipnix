@@ -68,6 +68,21 @@ Everything else is replaced with the archive's version: `app/`, `public/`,
 The DAG hash cache is invalidated after an update, so new normalisation rules
 reach modules whose source did not change.
 
+### cPanel split webroot warning
+
+The standard [cPanel deployment](/docs/cpanel) copies the contents of
+`~/pipnix/public/` to `~/public_html/pipnix/`. The built-in updater applies
+archives to the private application tree; it does **not yet mirror** updated
+`public/` files to that separate webroot. The PHP backend can update while the
+live front controller/assets stay old. After an updater run, manually copy the
+updated public files into `public_html/pipnix/`, or use an installation whose
+document root/symlink points directly at `~/pipnix/public/`.
+
+Until split-webroot synchronization is implemented, for the standard cPanel
+layout prefer a release-zip update: back up first, update the private source,
+run `php app/install.php`, then copy the updated `public/` contents to
+`public_html/pipnix/`.
+
 ## Permissions
 
 The PHP user must be able to write `app/`, `public/` and the files inside them.

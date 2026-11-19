@@ -112,6 +112,10 @@ for PAGE in / /dags /runs /logs /python /admin /admin/updates /docs/dags; do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$B$PAGE")
   [[ "$CODE" == "200" ]] || fail "$PAGE returned $CODE"
 done
+GUIDE=$(curl -s -b "$JAR" "$B/docs")
+grep -q 'Persyaratan' <<<"$GUIDE" || fail "getting-started guide content missing"
+CPANEL_GUIDE=$(curl -s -b "$JAR" "$B/docs/cpanel")
+grep -q 'Deploying to cPanel' <<<"$CPANEL_GUIDE" || fail "cPanel guide content missing"
 UPDATES=$(curl -s -b "$JAR" "$B/admin/updates")
 grep -q '↻ Check now' <<<"$UPDATES" || fail "GitHub check button missing in Docker"
 grep -q 'disabled>↻ Check now' <<<"$UPDATES" && fail "GitHub check should remain enabled in Docker"

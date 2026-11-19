@@ -772,8 +772,10 @@ function logs_index_page(): void
 function docs_page(string $slug): void
 {
     $docs = [
-        ''        => ['Deploying to cPanel', 'deploy'],
-        'deploy'  => ['Deploying to cPanel', 'deploy'],
+        ''        => ['Panduan Lengkap', 'GUIDE'],
+        'guide'   => ['Panduan Lengkap', 'GUIDE'],
+        'cpanel'  => ['Deploying to cPanel', 'DEPLOY'],
+        'deploy'  => ['Deploying to cPanel', 'DEPLOY'],
         'dags'    => ['Writing DAGs', 'DAGS'],
         'docker'  => ['Running with Docker', 'DOCKER'],
         'updates' => ['Updating pipnix', 'UPDATE'],
@@ -781,7 +783,7 @@ function docs_page(string $slug): void
     if (!isset($docs[$slug])) {
         http_response_code(404);
         render('error', ['code' => 404, 'title' => 'Doc not found',
-            'message' => 'Available docs: deploy, dags, docker, updates.'], 'bare');
+            'message' => 'Available docs: guide, cpanel, dags, docker, updates.'], 'bare');
         return;
     }
     [$title, $file] = $docs[$slug];
@@ -792,12 +794,20 @@ function docs_page(string $slug): void
             'message' => 'The guide file is missing on this install.'], 'bare');
         return;
     }
+    $markdown = (string) file_get_contents($path);
+    // The page chrome already provides the visible H1. Keep the source title
+    // for GitHub/readme use, but avoid rendering a duplicate heading in-app.
+    $markdown = (string) preg_replace('/^\s*#\s+[^\r\n]+\R+/', '', $markdown, 1);
     render('doc', [
         'title' => $title,
         'nav' => 'docs',
-        'slug' => $slug === 'deploy' ? '' : $slug,
+        'slug' => match ($slug) {
+            '', 'guide' => 'guide',
+            'deploy' => 'cpanel',
+            default => $slug,
+        },
         'head' => $title,
-        'html' => md_to_html((string) file_get_contents($path)),
+        'html' => md_to_html($markdown),
     ]);
 }
 
