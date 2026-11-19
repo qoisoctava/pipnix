@@ -2,6 +2,7 @@
 <header class="page-head">
   <h1>Admin</h1>
   <div class="toolbar">
+    <a class="btn" href="<?= url('/admin/updates') ?>">Updates</a>
     <a class="btn" href="<?= url('/admin/settings') ?>">Settings</a>
     <a class="btn" href="<?= url('/admin/audit') ?>">Audit log</a>
     <a class="btn" href="<?= url('/python') ?>">Environments</a>

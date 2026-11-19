@@ -100,6 +100,24 @@ make docker-down      # stop, keep data
 📖 **Full guide: [docs/DOCKER.md](docs/DOCKER.md)** — upgrades, backups,
 Python packages, reverse proxy/TLS, alerts and troubleshooting.
 
+## Updating
+
+**Admin → Updates** compares this installation with GitHub (a release tag or
+the newest commit of a branch) and applies a backup-first update: `app/`,
+`public/` and the rest of the code are replaced, while `app/config.php`,
+`.env`, `dags/`, `jobs/`, `logs/` and `storage/` are never touched; migrations
+run afterwards, and the previous files can be rolled back. Hosts without
+outbound access can upload a release zip instead.
+
+```bash
+php app/ops.php update:check
+php app/ops.php update:apply
+php app/ops.php update:rollback
+```
+
+📖 **Guide: [docs/UPDATE.md](docs/UPDATE.md)** — channels, tokens for private
+forks, permissions, Docker behaviour and troubleshooting.
+
 ## DAG format
 
 ```python
@@ -245,7 +263,7 @@ lib/                  dag_loader.py + runner.py (stdlib only)
 public/               web console (index.php + views/ + assets/)
 dags/ · jobs/         DAG definitions and task code
 tests/                unit tests (php/) + e2e harness
-docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md, DOCKER.md
+docs/                 logo (dark/light), app icon, screenshots, DEPLOY.md, DAGS.md, DOCKER.md, UPDATE.md
 dags/examples/        copy-paste DAG patterns (not auto-loaded)
 docker/ · docker-compose.yml   single-container + MySQL deployment
 schema.sql · Makefile · README.md

@@ -51,6 +51,14 @@ $config = [
         'title'     => $env('PIPNIX_UI_TITLE', 'pipnix'),
         'base_path' => $env('PIPNIX_BASE_PATH', ''),
     ],
+    'updater' => [
+        'enabled'      => $env('PIPNIX_UPDATER_ENABLED', '1') === '1',
+        'repo'         => $env('PIPNIX_UPDATE_REPO', 'qoisoctava/pipnix'),
+        'channel'      => $env('PIPNIX_UPDATE_CHANNEL', 'branch'),
+        'branch'       => $env('PIPNIX_UPDATE_BRANCH', 'main'),
+        'token'        => $env('PIPNIX_UPDATE_TOKEN'),
+        'allow_docker' => $env('PIPNIX_UPDATE_ALLOW_DOCKER', '0') === '1',
+    ],
 ];
 
 $php = "<?php\n"

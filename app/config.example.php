@@ -45,4 +45,15 @@ return [
     'ui' => [
         'title' => 'pipnix',
     ],
+
+    // Built-in updater — pulls source archives from GitHub. Set a read-only
+    // token for a private fork; branch is "main" until releases are tagged.
+    'updater' => [
+        'enabled'      => true,
+        'repo'         => 'qoisoctava/pipnix',
+        'channel'      => 'branch',   // or "release"
+        'branch'       => 'main',
+        'token'        => null,
+        'allow_docker' => false,      // Docker should rebuild the image instead
+    ],
 ];

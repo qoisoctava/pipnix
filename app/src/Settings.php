@@ -73,6 +73,10 @@ final class Settings
             'task.retry_delay'=> self::int('task.retry_delay', (int) Env::cfg('task_defaults.retry_delay', 300)),
             'task.timeout'    => self::int('task.timeout', (int) Env::cfg('task_defaults.timeout', 0)),
             'task.email'      => self::bool('task.email', (bool) Env::cfg('task_defaults.email_on_failure', false)),
+            'updater.enabled' => self::bool('updater.enabled', (bool) Env::cfg('updater.enabled', true)),
+            'updater.repo'    => (string) self::get('updater.repo', (string) Env::cfg('updater.repo', 'qoisoctava/pipnix')),
+            'updater.channel' => (string) self::get('updater.channel', (string) Env::cfg('updater.channel', 'branch')),
+            'updater.branch'  => (string) self::get('updater.branch', (string) Env::cfg('updater.branch', 'main')),
         ];
     }
 

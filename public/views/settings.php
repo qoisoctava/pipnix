@@ -92,6 +92,42 @@
     </div>
   </section>
 
+  <section class="card">
+    <div class="card-head">
+      <h3>Updates</h3>
+      <span class="muted small">source archives from GitHub</span>
+    </div>
+    <div class="form-grid">
+      <div>
+        <label>Updater</label>
+        <label class="check"><input type="checkbox" name="updater_enabled" value="1"
+          <?= $values['updater.enabled'] ? 'checked' : '' ?>> enable checks and self-update</label>
+      </div>
+      <div>
+        <label for="u-repo">Repository</label>
+        <input id="u-repo" name="updater_repo" class="mono"
+               value="<?= e((string) $values['updater.repo']) ?>" placeholder="owner/name">
+      </div>
+      <div>
+        <label for="u-channel">Channel</label>
+        <select id="u-channel" name="updater_channel">
+          <option value="branch" <?= $values['updater.channel'] === 'branch' ? 'selected' : '' ?>>branch (latest commit)</option>
+          <option value="release" <?= $values['updater.channel'] === 'release' ? 'selected' : '' ?>>release (latest tag)</option>
+        </select>
+      </div>
+      <div>
+        <label for="u-branch">Branch</label>
+        <input id="u-branch" name="updater_branch" class="mono"
+               value="<?= e((string) $values['updater.branch']) ?>" placeholder="main">
+      </div>
+    </div>
+    <p class="hint">
+      Private forks: set <span class="mono">updater.token</span> in
+      <span class="mono">app/config.php</span> — tokens are never stored in the console.
+      Docker disables self-update by default; rebuild the image instead.
+    </p>
+  </section>
+
   <div class="toolbar">
     <button class="btn btn-primary" type="submit">Save changes</button>
   </div>

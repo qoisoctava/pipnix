@@ -25,10 +25,11 @@ RUN apt-get update \
         python3 \
         python3-venv \
         python3-pip \
+        libzip-dev \
         tini \
         tzdata \
         util-linux \
- && docker-php-ext-install -j"$(nproc)" pdo_mysql \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql zip \
  && ln -sf /usr/bin/python3 /usr/local/bin/python \
  && rm -rf /var/lib/apt/lists/*
 

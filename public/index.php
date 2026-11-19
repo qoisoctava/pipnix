@@ -169,6 +169,10 @@ switch ($page) {
             settings_page();
             return;
         }
+        if (($segments[1] ?? '') === 'updates') {
+            updates_page();
+            return;
+        }
         admin_page();
         return;
     default:
@@ -772,11 +776,12 @@ function docs_page(string $slug): void
         'deploy'  => ['Deploying to cPanel', 'deploy'],
         'dags'    => ['Writing DAGs', 'DAGS'],
         'docker'  => ['Running with Docker', 'DOCKER'],
+        'updates' => ['Updating pipnix', 'UPDATE'],
     ];
     if (!isset($docs[$slug])) {
         http_response_code(404);
         render('error', ['code' => 404, 'title' => 'Doc not found',
-            'message' => 'Available docs: deploy, dags, docker.'], 'bare');
+            'message' => 'Available docs: deploy, dags, docker, updates.'], 'bare');
         return;
     }
     [$title, $file] = $docs[$slug];
@@ -892,6 +897,21 @@ function account_password_page(): void
 }
 
 // ================================================================== admin
+function updates_page(): void
+{
+    render('updates', [
+        'title' => 'Software updates',
+        'nav' => 'admin',
+        'state' => Updater::state(),
+        'check' => Updater::cached(),
+        'running' => Updater::isRunning(),
+        'backup' => Updater::lastBackupMeta(),
+        'log' => Updater::logTail(80),
+        'reason' => Updater::unavailableReason(),
+        'config' => Updater::config(),
+    ]);
+}
+
 function settings_page(): void
 {
     render('settings', [

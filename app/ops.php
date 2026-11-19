@@ -18,6 +18,9 @@
  *   php app/ops.php venv:requirements --name=NAME --file=requirements.txt
  *   php app/ops.php venv:create --name=NAME --path=/path/to/venv [--python=python3]
  *   php app/ops.php venv:delete --name=NAME
+ *   php app/ops.php update:check
+ *   php app/ops.php update:apply [--archive=FILE]
+ *   php app/ops.php update:rollback
  */
 declare(strict_types=1);
 
@@ -91,6 +94,12 @@ function dispatch(string $cmd, array $opts, array $pos): int
             return cmdVenvCreate($opts);
         case 'venv:delete':
             return cmdVenvDelete($opts);
+        case 'update:check':
+            return cmdUpdateCheck();
+        case 'update:apply':
+            return cmdUpdateApply($opts);
+        case 'update:rollback':
+            return cmdUpdateRollback();
         case 'prune':
             return cmdPrune($opts);
         default:
@@ -121,6 +130,9 @@ pipnix ops
   venv:requirements --name=NAME --file=FILE
   venv:create --name=NAME --path=DIR [--python=BIN]
   venv:delete --name=NAME           remove the registration (files stay)
+  update:check                      compare with GitHub (release or branch)
+  update:apply [--archive=FILE]     download + apply + migrate + backup
+  update:rollback                   restore the newest backup (files only)
   prune [--days=N] [--dry-run]       drop finished runs + their logs older
                                     than N days (audit rows are kept)
 TXT;
@@ -688,4 +700,112 @@ function procRunPassthrough(array $cmd): int
     fclose($pipes[1]);
     fclose($pipes[2]);
     return proc_close($proc);
+}
+
+
+// ---------------------------------------------------------------- updater
+
+function cmdUpdateCheck(): int
+{
+    $r = Updater::check(true);
+    if (empty($r['ok'])) {
+        fwrite(STDERR, "update: " . ($r['error'] ?? 'unknown error') . "\n");
+        return 1;
+    }
+    $cur = $r['current'];
+    $rem = $r['remote'];
+    $short = static fn (?string $sha): string => $sha ? substr($sha, 0, 7) : 'unknown';
+    echo "channel: {$r['channel']} ({$r['repo']})\n";
+    echo "current: {$cur['version']} · " . $short($cur['commit']) . "\n";
+    echo "remote:  {$rem['version']} · " . $short($rem['commit'] ?? null) . "\n";
+    if (!empty($rem['date'])) {
+        echo "date:    {$rem['date']}\n";
+    }
+    if (!empty($rem['title'])) {
+        echo "title:   {$rem['title']}\n";
+    }
+    echo "update:  " . (!empty($r['update']) ? "available" : "up to date") . "\n";
+    return 0;
+}
+
+function cmdUpdateApply(array $opts): int
+{
+    if (!Updater::lock('apply')) {
+        fwrite(STDERR, "another update is already running\n");
+        return 1;
+    }
+
+    $archive = (string) ($opts['archive'] ?? '');
+    $meta = ['channel' => 'upload'];
+
+    if ($archive === '') {
+        $check = Updater::check(true);
+        if (empty($check['ok'])) {
+            fwrite(STDERR, "update: " . ($check['error'] ?? 'check failed') . "\n");
+            return 1;
+        }
+        if (empty($check['update'])) {
+            echo "already up to date ({$check['current']['version']})\n";
+            return 0;
+        }
+        [$archive, $err] = Updater::download($check['remote']);
+        if ($err !== null || $archive === null) {
+            fwrite(STDERR, "download failed: {$err}\n");
+            return 1;
+        }
+        $meta = [
+            'version' => $check['remote']['version'],
+            'commit'  => $check['remote']['commit'],
+            'channel' => $check['channel'],
+        ];
+        echo "downloaded: {$archive}\n";
+    }
+
+    if (!is_file($archive)) {
+        fwrite(STDERR, "archive not found: {$archive}\n");
+        return 1;
+    }
+
+    echo "applying {$archive} to " . PN_BASE . " …\n";
+    $res = Updater::applyArchiveTo($archive, PN_BASE, true, $meta);
+    if (empty($res['ok'])) {
+        fwrite(STDERR, "update failed: " . ($res['error'] ?? 'unknown') . "\n");
+        foreach (($res['failed'] ?? []) as $f) {
+            fwrite(STDERR, "  failed: {$f}\n");
+        }
+        return 1;
+    }
+    $meta = is_array($res['meta'] ?? null) ? $res['meta'] : [];
+    if ($meta !== []) {
+        Updater::saveState($meta + ['applied_at' => Env::now()]);
+    }
+    @unlink(Updater::dir() . '/check.json');
+    echo "files: {$res['copied']} copied, {$res['skipped']} protected/skipped\n";
+    echo "backup: {$res['backup']}\n";
+    if (($res['migrate_out'] ?? '') !== '') {
+        echo $res['migrate_out'], "\n";
+    }
+    echo "migrations: rc=" . (string) ($res['migrate_rc'] ?? 'n/a') . "\n";
+    Audit::record('cli', 'updater.applied',
+        (string) (Updater::state()['version'] ?? PN_VERSION) . ' via ' . ($meta['channel'] ?? 'upload'));
+    return 0;
+}
+
+function cmdUpdateRollback(): int
+{
+    if (!Updater::lock('rollback')) {
+        fwrite(STDERR, "another update is already running\n");
+        return 1;
+    }
+    $res = Updater::rollback();
+    if (empty($res['ok'])) {
+        fwrite(STDERR, "rollback failed: " . ($res['error'] ?? 'unknown') . "\n");
+        return 1;
+    }
+    echo "restored: {$res['restored']} files from backup\n";
+    if (($res['migrate_out'] ?? '') !== '') {
+        echo $res['migrate_out'], "\n";
+    }
+    Audit::record('cli', 'updater.rolled_back', (string) ($res['meta']['dir'] ?? 'backup'));
+    return 0;
 }

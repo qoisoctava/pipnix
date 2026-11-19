@@ -204,6 +204,8 @@ DOCS2=$(get /docs/dags)
 grep -q "Writing DAGs\|DAG-level keys\|Task-level keys" <<<"$DOCS2" || fail "dags doc missing"
 DOCS3=$(get /docs/docker)
 grep -q "Running with Docker\|docker compose up" <<<"$DOCS3" || fail "docker doc missing"
+DOCS4=$(get /docs/updates)
+grep -q "Updating pipnix\|update:apply" <<<"$DOCS4" || fail "updates doc missing"
 ok "bundled docs pages"
 
 PY=$(get /python)
@@ -219,7 +221,11 @@ ok "admin (admin role)"
 
 SETTINGS=$(get /admin/settings)
 grep -q "Global task defaults\|Retention" <<<"$SETTINGS" || fail "settings page missing"
-ok "settings page"
+grep -q "Updates" <<<"$SETTINGS" || fail "settings page missing updater section"
+UPDATES=$(get /admin/updates)
+grep -q "Software updates" <<<"$UPDATES" || fail "updates page missing"
+grep -q "Latest on GitHub" <<<"$UPDATES" || fail "updates page missing remote card"
+ok "settings + updates pages"
 
 AUDIT=$(get /admin/audit)
 grep -q "Audit log" <<<"$AUDIT" || fail "audit page missing"

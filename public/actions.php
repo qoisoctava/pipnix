@@ -95,6 +95,19 @@ function handle_post(string $page, array $segments): void
         }
         return;
     }
+    if ($page === 'admin' && ($segments[1] ?? '') === 'updates') {
+        $verb = $segments[2] ?? '';
+        if ($verb === 'check') {
+            post_update_check();
+        } elseif ($verb === 'apply') {
+            post_update_apply();
+        } elseif ($verb === 'rollback') {
+            post_update_rollback();
+        } elseif ($verb === 'upload') {
+            post_update_upload();
+        }
+        return;
+    }
     if ($page === 'admin' && ($segments[1] ?? '') === 'settings') {
         if (($segments[2] ?? '') === 'purge') {
             post_settings_purge();
@@ -875,7 +888,26 @@ function post_settings_save(): void
     $delay     = max(0, min(86400, (int) ($_POST['task_retry_delay'] ?? 300)));
     $timeout   = max(0, min(86400, (int) ($_POST['task_timeout'] ?? 0)));
 
+    $updaterRepo = trim((string) ($_POST['updater_repo'] ?? 'qoisoctava/pipnix'));
+    if (!preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $updaterRepo)) {
+        flash('Update repository must look like owner/name.', 'bad');
+        redirect('/admin/settings');
+    }
+    $updaterChannel = (string) ($_POST['updater_channel'] ?? 'branch');
+    if (!in_array($updaterChannel, ['branch', 'release'], true)) {
+        $updaterChannel = 'branch';
+    }
+    $updaterBranch = trim((string) ($_POST['updater_branch'] ?? 'main'));
+    if (!preg_match('#^[A-Za-z0-9._/-]{1,100}$#', $updaterBranch)) {
+        flash('Invalid branch name.', 'bad');
+        redirect('/admin/settings');
+    }
+
     $before = Settings::effective();
+    Settings::set('updater.enabled', !empty($_POST['updater_enabled']) ? '1' : '0');
+    Settings::set('updater.repo', $updaterRepo);
+    Settings::set('updater.channel', $updaterChannel);
+    Settings::set('updater.branch', $updaterBranch);
     Settings::set('alerts.enabled', !empty($_POST['alerts_enabled']) ? '1' : '0');
     Settings::set('alerts.from', $from);
     Settings::set('alerts.to', implode(',', $to));
@@ -914,6 +946,92 @@ function post_settings_purge(): void
     flash($rc === 0 ? ('Purge finished: ' . $summary) : ('Purge failed: ' . $summary),
         $rc === 0 ? 'ok' : 'bad');
     redirect('/admin/settings');
+}
+
+// ================================================================== updater
+
+function post_update_check(): void
+{
+    require_role('admin');
+    csrf_check();
+    $r = Updater::check(true);
+    if (empty($r['ok'])) {
+        audit('updater.checked', 'failed');
+        flash('Update check failed: ' . ($r['error'] ?? 'unknown error'), 'bad');
+    } elseif (!empty($r['update'])) {
+        audit('updater.checked', (string) $r['remote']['version']);
+        flash('Update available: ' . $r['remote']['version'] . '.');
+    } else {
+        audit('updater.checked', 'up-to-date');
+        flash('Already up to date (' . $r['current']['version'] . ').');
+    }
+    redirect('/admin/updates');
+}
+
+function post_update_apply(): void
+{
+    require_role('admin');
+    csrf_check();
+    if (($reason = Updater::unavailableReason()) !== null) {
+        flash($reason, 'bad');
+        redirect('/admin/updates');
+    }
+    if (Updater::isRunning()) {
+        flash('An update is already running.', 'bad');
+        redirect('/admin/updates');
+    }
+    spawn_ops(['update:apply'], Updater::dir() . '/update.log');
+    audit('updater.started', 'github');
+    flash('Update started — this page refreshes until it finishes.');
+    redirect('/admin/updates');
+}
+
+function post_update_rollback(): void
+{
+    require_role('admin');
+    csrf_check();
+    if (Updater::isRunning()) {
+        flash('An update is already running.', 'bad');
+        redirect('/admin/updates');
+    }
+    spawn_ops(['update:rollback'], Updater::dir() . '/update.log');
+    audit('updater.rollback_started', 'backup');
+    flash('Rollback started — files only; database migrations are not reverted.');
+    redirect('/admin/updates');
+}
+
+function post_update_upload(): void
+{
+    require_role('admin');
+    csrf_check();
+    if (Updater::isRunning()) {
+        flash('An update is already running.', 'bad');
+        redirect('/admin/updates');
+    }
+    $file = $_FILES['archive'] ?? null;
+    if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        flash('Choose a release zip or tar.gz.', 'bad');
+        redirect('/admin/updates');
+    }
+    if ((int) $file['size'] > 33554432) {
+        flash('Archive is too large (max 32 MB).', 'bad');
+        redirect('/admin/updates');
+    }
+    $name = strtolower((string) $file['name']);
+    if (!preg_match('/\.(zip|tar|gz|tgz)$/', $name)) {
+        flash('Only .zip, .tar, .tar.gz or .tgz archives are accepted.', 'bad');
+        redirect('/admin/updates');
+    }
+    $dest = Updater::dir() . '/upload-' . date('Ymd-His') . '-'
+        . bin2hex(random_bytes(3)) . '.' . pathinfo($name, PATHINFO_EXTENSION);
+    if (!move_uploaded_file((string) $file['tmp_name'], $dest)) {
+        flash('Upload failed (permissions?).', 'bad');
+        redirect('/admin/updates');
+    }
+    spawn_ops(['update:apply', '--archive=' . $dest], Updater::dir() . '/update.log');
+    audit('updater.uploaded', (string) $file['name']);
+    flash('Archive uploaded — applying in the background.');
+    redirect('/admin/updates');
 }
 
 // ================================================================== pages

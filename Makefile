@@ -1,8 +1,9 @@
 .PHONY: unit e2e ui ui-actions pass-change check tick clean-test dist \
         docker-up docker-down docker-logs docker-smoke
 
-unit:            ## cron/logger unit tests (no DB)
+unit:            ## cron/logger/updater unit tests (no DB, no network)
 	php tests/php/cron_test.php
+	php tests/php/updater_test.php
 
 check: unit      ## php syntax + unit tests
 	@find app -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null
