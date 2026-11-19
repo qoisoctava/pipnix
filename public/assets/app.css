@@ -25,7 +25,7 @@
   --space-3: 16px;
   --space-4: 24px;
   --space-5: 32px;
-  --card-gap: 24px;
+  --card-gap: 18px;
   --mono: Menlo, ui-monospace, "SF Mono", monospace;
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -109,7 +109,7 @@ p { margin: 8px 0; }
 .section { color: var(--label); font-size: 15px; font-weight: 600; margin: 0 0 12px; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .stack { display: flex; flex-direction: column; gap: var(--card-gap); }
-.cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 16px; }
+.cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 28px; margin-top: 16px; }
 .cols-3 > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .label { color: var(--muted); font-size: 13px; }
 
