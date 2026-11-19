@@ -37,11 +37,15 @@ $items = [
       <a class="nav-item" href="<?= url('/docs') ?>" title="Bundled guides">
         <span class="glyph">❑</span><span class="label">Docs</span>
       </a>
+      <div class="nav-user" title="Signed in as <?= e($user['username'] ?? 'User') ?>">
+        <span class="glyph">◯</span>
+        <span class="label"><?= e($user['username'] ?? 'User') ?></span>
+      </div>
       <form method="post" action="<?= url('/logout') ?>">
         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
-        <button class="nav-item as-button" type="submit">
-          <span class="glyph">◯</span>
-          <span class="label"><?= e($user['username'] ?? 'User') ?></span>
+        <button class="nav-item" type="submit" title="Sign out">
+          <span class="glyph">⏻</span>
+          <span class="label">Logout</span>
         </button>
       </form>
     </div>

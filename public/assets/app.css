@@ -71,6 +71,16 @@ p { margin: 8px 0; }
 .nav-item.active { background: var(--nav-active); color: var(--title); }
 .nav-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; width: 68px; }
 .nav-bottom form { margin: 0; }
+.nav-user {
+  width: 68px; padding: 10px 0; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--muted); font-size: 11px; font-weight: 500;
+}
+.nav-user .glyph { font-size: 15px; line-height: 1; }
+.nav-user .label {
+  max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nav-bottom button.nav-item:hover { color: var(--warn); }
 
 .content { flex: 1; min-width: 0; padding: 28px 40px 48px; max-width: 1440px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
