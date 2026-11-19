@@ -59,5 +59,29 @@ $items = [
     <?= $content ?>
   </main>
 </div>
+<div class="cmdk" id="cmdk" hidden>
+  <form class="cmdk-panel" method="get" action="<?= url('/search') ?>">
+    <input name="q" id="cmdk-input" placeholder="Search Dags, runs, tasks…" autocomplete="off">
+    <div class="cmdk-foot"><span>↵ search</span><span>esc close</span><span>⌘K / Ctrl-K</span></div>
+  </form>
+</div>
+<script>
+(() => {
+  const modal = document.getElementById('cmdk');
+  const input = document.getElementById('cmdk-input');
+  if (!modal || !input) return;
+  const open = () => { modal.hidden = false; input.focus(); };
+  const close = () => { modal.hidden = true; };
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      modal.hidden ? open() : close();
+    } else if (e.key === 'Escape' && !modal.hidden) {
+      close();
+    }
+  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+})();
+</script>
 </body>
 </html>

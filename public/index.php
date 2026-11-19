@@ -140,6 +140,9 @@ switch ($page) {
     case 'docs':
         docs_page((string) ($segments[1] ?? ''));
         return;
+    case 'search':
+        search_page();
+        return;
     case 'python':
         if (isset($segments[1]) && ($segments[2] ?? '') === 'log') {
             venv_log_page((string) $segments[1]);
@@ -790,6 +793,55 @@ function docs_page(string $slug): void
         'slug' => $slug === 'deploy' ? '' : $slug,
         'head' => $title,
         'html' => md_to_html((string) file_get_contents($path)),
+    ]);
+}
+
+// ================================================================== search
+function search_page(): void
+{
+    $q = trim((string) ($_GET['q'] ?? ''));
+    $type = (string) ($_GET['type'] ?? 'all');
+    if (!in_array($type, ['all', 'dags', 'runs', 'tasks'], true)) {
+        $type = 'all';
+    }
+
+    $dags = $runs = $tasks = [];
+    if ($q !== '') {
+        $like = '%' . $q . '%';
+        if ($type === 'all' || $type === 'dags') {
+            $dags = Db::all(
+                'SELECT name, is_active, is_favorite FROM pn_dag
+                  WHERE name LIKE ? ORDER BY name LIMIT 20', [$like]);
+        }
+        if ($type === 'all' || $type === 'runs') {
+            $runs = Db::all(
+                'SELECT r.id, r.run_id, r.state, r.started_at, d.name AS dag_name
+                   FROM pn_dag_run r JOIN pn_dag d ON d.id = r.dag_id
+                  WHERE r.run_id LIKE ? OR d.name LIKE ?
+                  ORDER BY r.id DESC LIMIT 20', [$like, $like]);
+        }
+        if ($type === 'all' || $type === 'tasks') {
+            $tasks = Db::all(
+                'SELECT tr.id, tr.state, tr.started_at, t.name AS task_name,
+                        d.name AS dag_name, r.id AS run_db_id
+                   FROM pn_task_run tr
+                   JOIN pn_task t     ON t.id = tr.task_id
+                   JOIN pn_dag_run r  ON r.id = tr.dag_run_id
+                   JOIN pn_dag d      ON d.id = r.dag_id
+                  WHERE t.name LIKE ? OR d.name LIKE ?
+                  ORDER BY tr.id DESC LIMIT 20', [$like, $like]);
+        }
+    }
+
+    render('search', [
+        'title' => 'Search',
+        'nav' => '',
+        'q' => $q,
+        'type' => $type,
+        'dags' => $dags,
+        'runs' => $runs,
+        'tasks' => $tasks,
+        'total' => count($dags) + count($runs) + count($tasks),
     ]);
 }
 

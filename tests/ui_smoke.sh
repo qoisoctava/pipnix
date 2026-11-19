@@ -151,6 +151,12 @@ DAGS=$(get /dags)
 grep -q "ui_flow" <<<"$DAGS" || fail "dags list missing ui_flow"
 ok "dags list"
 
+SEARCH=$(get "/search?q=ui_flow")
+grep -q "results\? for\|result for" <<<"$SEARCH" || fail "search results header missing"
+grep -q "ui_flow" <<<"$SEARCH" || fail "search did not match the dag"
+grep -q "Task instances" <<<"$SEARCH" || fail "search missing task group"
+ok "global search (+ cmd-k palette)"
+
 DAG=$(get /dags/ui_flow)
 grep -q "Run history" <<<"$DAG" || fail "dag detail missing run history"
 grep -q "step_one\|ui_demo.step_one" <<<"$DAG" || fail "dag detail missing task func"

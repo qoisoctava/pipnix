@@ -8,6 +8,7 @@
       <span class="search-glyph">⌕</span>
       <input name="q" value="<?= e($search) ?>" placeholder="Search Dags">
     </form>
+    <span class="muted small" title="Global search">⌘K</span>
     <?php if (can('edit')): ?>
       <a class="btn" href="<?= url('/dags/new') ?>">+ New</a>
       <a class="btn" href="<?= url('/dags/import') ?>">Import</a>
