@@ -331,6 +331,8 @@ final class Updater
         if ($migrate && $failed === []) {
             [$migrateRc, $migrateOut] = self::migrate();
         }
+        $migrateFailed = $migrateRc !== null && $migrateRc !== 0;
+        $ok = $failed === [] && !$migrateFailed;
 
         // New normalisation rules must reach DAGs whose source did not change.
         try {
@@ -345,7 +347,7 @@ final class Updater
         }
 
         return [
-            'ok' => $failed === [],
+            'ok' => $ok,
             'meta' => $meta,
             'copied' => $copied,
             'skipped' => $skipped,
@@ -353,7 +355,9 @@ final class Updater
             'backup' => $backup,
             'migrate_rc' => $migrateRc,
             'migrate_out' => trim($migrateOut),
-            'error' => $failed === [] ? null : count($failed) . ' file(s) could not be replaced',
+            'error' => $failed !== []
+                ? count($failed) . ' file(s) could not be replaced'
+                : ($migrateFailed ? 'schema migrations failed (rc=' . $migrateRc . ')' : null),
         ];
     }
 

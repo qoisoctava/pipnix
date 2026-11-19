@@ -108,7 +108,7 @@ T=$(curl -s -c "$JAR" "$B/login" | sed -n 's/.*name="_csrf" value="\([a-f0-9]*\)
 LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" \
   -d "_csrf=$T&username=admin&password=Good-Pass-1" "$B/login")
 [[ "$LOC" == "$B/" ]] || fail "login with the new password failed (got '$LOC')"
-for PAGE in / /dags /runs /logs /python /admin /docs/dags; do
+for PAGE in / /dags /runs /logs /python /admin /admin/updates /docs/dags; do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$B$PAGE")
   [[ "$CODE" == "200" ]] || fail "$PAGE returned $CODE"
 done
