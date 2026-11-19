@@ -145,9 +145,10 @@ The entrypoint re-applies `install.php` (idempotent schema + migrations),
 keeps the existing admin account and leaves your volumes alone. For a release
 zip, unpack it over the repository and rebuild.
 
-The in-app updater (**Admin → Updates**) is disabled inside the container by
-default: replacing files in the image layer would be lost on the next rebuild.
-The page says so; `docker compose build --pull` is the durable path. Set
+The in-app updater (**Admin → Updates**) can still **check GitHub** from the
+container. Applying an archive or rolling back files is disabled by default:
+changes to the image layer would be lost on the next rebuild. For a durable
+update, use `docker compose build --pull && docker compose up -d`. Set
 `PIPNIX_UPDATE_ALLOW_DOCKER=1` only if you understand that trade-off.
 
 ## Configuration

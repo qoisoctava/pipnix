@@ -59,8 +59,8 @@ final class Updater
         return self::isDocker() && !self::config()['allow_docker'];
     }
 
-    /** @return string|null a reason when updates are unavailable */
-    public static function unavailableReason(): ?string
+    /** @return string|null a reason when checking GitHub is unavailable */
+    public static function checkUnavailableReason(): ?string
     {
         $cfg = self::config();
         if (!$cfg['enabled']) {
@@ -69,10 +69,25 @@ final class Updater
         if (!preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $cfg['repo'])) {
             return 'Set a valid GitHub repository as owner/name.';
         }
+        return null;
+    }
+
+    /** @return string|null a reason applying file updates is unavailable */
+    public static function applyUnavailableReason(): ?string
+    {
+        if (($reason = self::checkUnavailableReason()) !== null) {
+            return $reason;
+        }
         if (self::dockerBlocked()) {
             return 'Running in Docker: rebuild the image instead (docker compose build --pull && docker compose up -d). Self-update is disabled unless updater.allow_docker is true.';
         }
         return null;
+    }
+
+    /** Backwards-compatible alias for operations that mutate installed files. */
+    public static function unavailableReason(): ?string
+    {
+        return self::applyUnavailableReason();
     }
 
     // ---------------------------------------------------------------- state
@@ -113,7 +128,7 @@ final class Updater
     /** @return array{ok:bool,error?:string,update?:bool,...} */
     public static function check(bool $force = false): array
     {
-        if (($reason = self::unavailableReason()) !== null) {
+        if (($reason = self::checkUnavailableReason()) !== null) {
             return ['ok' => false, 'error' => $reason];
         }
         if (!$force && ($cached = self::cached()) !== null

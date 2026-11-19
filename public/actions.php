@@ -972,7 +972,7 @@ function post_update_apply(): void
 {
     require_role('admin');
     csrf_check();
-    if (($reason = Updater::unavailableReason()) !== null) {
+    if (($reason = Updater::applyUnavailableReason()) !== null) {
         flash($reason, 'bad');
         redirect('/admin/updates');
     }
@@ -990,6 +990,10 @@ function post_update_rollback(): void
 {
     require_role('admin');
     csrf_check();
+    if (($reason = Updater::applyUnavailableReason()) !== null) {
+        flash($reason, 'bad');
+        redirect('/admin/updates');
+    }
     if (Updater::isRunning()) {
         flash('An update is already running.', 'bad');
         redirect('/admin/updates');
@@ -1004,6 +1008,10 @@ function post_update_upload(): void
 {
     require_role('admin');
     csrf_check();
+    if (($reason = Updater::applyUnavailableReason()) !== null) {
+        flash($reason, 'bad');
+        redirect('/admin/updates');
+    }
     if (Updater::isRunning()) {
         flash('An update is already running.', 'bad');
         redirect('/admin/updates');

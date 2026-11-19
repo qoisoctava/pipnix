@@ -2,14 +2,15 @@
 /**
  * Admin → Software updates.
  * @var array $state @var ?array $check @var bool $running @var ?array $backup
- * @var array $log @var ?string $reason @var array $config
+ * @var array $log @var ?string $checkReason @var ?string $applyReason @var array $config
  */
 $short = static fn (?string $sha): string => $sha ? substr($sha, 0, 7) : 'unknown';
 $remote = is_array($check['remote'] ?? null) ? $check['remote'] : null;
 $available = !empty($check['update']);
 $currentVersion = (string) ($check['current']['version'] ?? $state['version'] ?? PN_VERSION);
 $currentCommit = $check['current']['commit'] ?? $state['commit'] ?? Updater::localCommit();
-$blocked = $reason !== null;
+$checkBlocked = $checkReason !== null;
+$applyBlocked = $applyReason !== null;
 ?>
 <?php if ($running): ?><meta http-equiv="refresh" content="5"><?php endif; ?>
 <header class="page-head">
@@ -34,10 +35,10 @@ $blocked = $reason !== null;
   </div>
 <?php endif; ?>
 
-<?php if ($blocked): ?>
+<?php if ($checkBlocked || $applyBlocked): ?>
   <div class="card" style="border-color:#4A3A12;margin-bottom:16px">
-    <div class="card-head"><h3>Self-update unavailable</h3></div>
-    <p class="muted" style="margin:0"><?= e($reason) ?></p>
+    <div class="card-head"><h3><?= $checkBlocked ? 'GitHub check unavailable' : 'Applying updates unavailable' ?></h3></div>
+    <p class="muted" style="margin:0"><?= e((string) ($checkReason ?? $applyReason)) ?></p>
   </div>
 <?php endif; ?>
 
@@ -102,9 +103,9 @@ $blocked = $reason !== null;
       <div class="toolbar" style="margin-top:14px">
         <form class="inline" method="post" action="<?= url('/admin/updates/check') ?>">
           <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
-          <button class="btn" type="submit" <?= $blocked || $running ? 'disabled' : '' ?>>↻ Check now</button>
+          <button class="btn" type="submit" <?= $checkBlocked || $running ? 'disabled' : '' ?>>↻ Check now</button>
         </form>
-        <?php if ($available && !$blocked && !$running): ?>
+        <?php if ($available && !$applyBlocked && !$running): ?>
           <form class="inline" method="post" action="<?= url('/admin/updates/apply') ?>"
                 onsubmit="return confirm('Download and apply <?= e((string) $remote['version']) ?>? Files are backed up first, then migrations run.')">
             <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
@@ -125,7 +126,7 @@ $blocked = $reason !== null;
         </div>
         <div>
           <label>&nbsp;</label>
-          <button class="btn" type="submit" <?= $running ? 'disabled' : '' ?>>Upload &amp; apply</button>
+          <button class="btn" type="submit" <?= $applyBlocked || $running ? 'disabled' : '' ?>>Upload &amp; apply</button>
         </div>
       </form>
     </section>
@@ -143,7 +144,7 @@ $blocked = $reason !== null;
         <form method="post" action="<?= url('/admin/updates/rollback') ?>"
               onsubmit="return confirm('Restore the files from the newest backup? Database migrations are NOT reverted.')">
           <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
-          <button class="btn btn-danger" type="submit" <?= $running ? 'disabled' : '' ?>>⟲ Roll back files</button>
+          <button class="btn btn-danger" type="submit" <?= $applyBlocked || $running ? 'disabled' : '' ?>>⟲ Roll back files</button>
         </form>
       <?php else: ?>
         <p class="muted">No backup yet — one is created before the first update.</p>

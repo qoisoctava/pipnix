@@ -907,7 +907,8 @@ function updates_page(): void
         'running' => Updater::isRunning(),
         'backup' => Updater::lastBackupMeta(),
         'log' => Updater::logTail(80),
-        'reason' => Updater::unavailableReason(),
+        'checkReason' => Updater::checkUnavailableReason(),
+        'applyReason' => Updater::applyUnavailableReason(),
         'config' => Updater::config(),
     ]);
 }

@@ -93,9 +93,9 @@ The updater refuses to run rather than half-copying a tree.
 
 ## Docker
 
-Self-update is disabled inside the container by default (`updater.allow_docker`
-is false); replacing files in the image layer is lost on the next rebuild.
-Update the image instead:
+GitHub checks remain available inside Docker. Applying/rolling back files is
+disabled by default (`updater.allow_docker` is false), because changes to the
+image layer are lost on the next rebuild. Update the image instead:
 
 ```bash
 docker compose build --pull && docker compose up -d

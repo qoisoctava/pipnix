@@ -730,6 +730,10 @@ function cmdUpdateCheck(): int
 
 function cmdUpdateApply(array $opts): int
 {
+    if (($reason = Updater::applyUnavailableReason()) !== null) {
+        fwrite(STDERR, "update: {$reason}\n");
+        return 1;
+    }
     if (!Updater::lock('apply')) {
         fwrite(STDERR, "another update is already running\n");
         return 1;
@@ -793,6 +797,10 @@ function cmdUpdateApply(array $opts): int
 
 function cmdUpdateRollback(): int
 {
+    if (($reason = Updater::applyUnavailableReason()) !== null) {
+        fwrite(STDERR, "rollback: {$reason}\n");
+        return 1;
+    }
     if (!Updater::lock('rollback')) {
         fwrite(STDERR, "another update is already running\n");
         return 1;

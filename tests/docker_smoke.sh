@@ -112,7 +112,12 @@ for PAGE in / /dags /runs /logs /python /admin /admin/updates /docs/dags; do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$B$PAGE")
   [[ "$CODE" == "200" ]] || fail "$PAGE returned $CODE"
 done
+UPDATES=$(curl -s -b "$JAR" "$B/admin/updates")
+grep -q '↻ Check now' <<<"$UPDATES" || fail "GitHub check button missing in Docker"
+grep -q 'disabled>↻ Check now' <<<"$UPDATES" && fail "GitHub check should remain enabled in Docker"
+grep -q 'Applying updates unavailable' <<<"$UPDATES" || fail "Docker apply restriction missing"
 ok "login + every page"
+ok "GitHub check stays enabled; file apply remains disabled in Docker"
 
 say "5. the scheduler tick loads DAGs (supercronic, every minute)"
 cat > "$DAG_FILE" <<'PY'

@@ -124,7 +124,7 @@
     <p class="hint">
       Private forks: set <span class="mono">updater.token</span> in
       <span class="mono">app/config.php</span> — tokens are never stored in the console.
-      Docker disables self-update by default; rebuild the image instead.
+      GitHub checks work in Docker; applying updates is disabled by default. Rebuild the image instead.
     </p>
   </section>
 
