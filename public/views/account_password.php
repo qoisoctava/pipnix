@@ -54,7 +54,7 @@ $forced = (int) ($user['must_change_password'] ?? 0) === 1;
   </form>
 </section>
 
-<section class="card" style="max-width:520px;margin-top:16px">
+<section class="card" style="max-width:520px">
   <div class="card-head"><h3>Profile</h3><span class="chip"><?= e((string) ($user['role'] ?? '')) ?></span></div>
   <div class="kv-row">
     <div><span class="label">User</span><span class="mono"><?= e((string) ($user['username'] ?? '')) ?></span></div>
