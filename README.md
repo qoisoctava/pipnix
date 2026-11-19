@@ -144,10 +144,14 @@ php -S 127.0.0.1:8099 -t public public/index.php
 # → http://127.0.0.1:8099  (sign in with the admin created by install.php)
 ```
 
-Pages: **Home** (stats, health, runner slots, Dag/Task breakdowns, recent
-failures), **Dags** (list + detail with task table and run-history grid),
-**Runs** (filterable list + run detail and logs), **Logs** (per-attempt log
-viewer), **Python** (venvs + package inventory), **Admin** (users, settings).
+Pages: **Home** (stats, health, runner slots, favorites, 24h/7d/30d
+breakdowns, recent failures), **Dags** (searchable list with star/pin, detail
+with **Grid · Graph · Gantt · Code** tabs and a run grid), **Runs** (filterable
+list, run detail and task-instance drill-down), **Logs** (per-attempt viewer
+with filter/highlight/download), **Python** (create/register venvs, install,
+upgrade all, requirements.txt, delete guard, package inventory), **Admin**
+(users + roles, scheduler/task-default/alerting/retention settings with purge,
+audit log).
 
 ## Deploy to cPanel
 
@@ -227,8 +231,10 @@ The e2e suite provisions a real venv and database, then verifies: schema install
 pip inventory, DAG loading with hash cache, trigger → dispatch → success,
 `result_json`, per-attempt logs, failure cascade, clear/rerun, pause/resume.
 The web suites cover login/roles, every read-only page, the DAG editor and
-import flow, trigger/pause/clear/mark actions, the venv package manager with
-its live pip log, user management and the audit log.
+import flow, trigger/pause/clear/mark actions, favorites and the
+Grid/Graph/Gantt/Code tabs, the task-instance and log pages, settings
+(defaults, retention, purge), venv create/delete/requirements with the
+delete guard, user roles and the audit log.
 
 ## Repository layout
 

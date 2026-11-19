@@ -332,7 +332,40 @@ function human_schedule(array $dag): string
     if ($dag['schedule_type'] === 'interval') {
         return 'every ' . (int) $dag['schedule'] . ' min';
     }
-    return (string) $dag['schedule'];
+    return cron_human((string) $dag['schedule']);
+}
+
+/** Turn the common cron shapes into a sentence; fall back to the expression. */
+function cron_human(string $expr): string
+{
+    $expr = trim($expr);
+    if ($expr === '* * * * *') {
+        return 'every minute';
+    }
+    if (preg_match('#^\*/(\d+) \* \* \* \*$#', $expr, $m)) {
+        return 'every ' . (int) $m[1] . ' minutes';
+    }
+    $parts = preg_split('/\s+/', $expr) ?: [];
+    if (count($parts) !== 5) {
+        return $expr;
+    }
+    [$min, $hour, $dom, $mon, $dow] = $parts;
+    $time = (ctype_digit($min) && ctype_digit($hour))
+        ? sprintf('%02d:%02d', (int) $hour, (int) $min)
+        : null;
+    $days = ['0' => 'Sunday', '1' => 'Monday', '2' => 'Tuesday', '3' => 'Wednesday',
+             '4' => 'Thursday', '5' => 'Friday', '6' => 'Saturday', '7' => 'Sunday'];
+
+    if ($time !== null && $dom === '*' && $mon === '*' && $dow === '*') {
+        return 'daily at ' . $time;
+    }
+    if ($time !== null && $dom === '*' && $mon === '*' && ctype_digit($dow)) {
+        return 'weekly on ' . ($days[$dow] ?? ('day ' . $dow)) . ' at ' . $time;
+    }
+    if ($time !== null && ctype_digit($dom) && $mon === '*' && $dow === '*') {
+        return 'monthly on day ' . (int) $dom . ' at ' . $time;
+    }
+    return 'cron ' . $expr . ($time !== null ? ' (' . $time . ')' : '');
 }
 
 function next_run_text(array $dag): string

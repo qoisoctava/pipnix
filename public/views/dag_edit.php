@@ -39,6 +39,10 @@ $schedule = $isEdit
         <input id="f-schedule" name="schedule" value="<?= e($schedule) ?>"
                placeholder="0 3 * * *  or  interval:60">
         <p class="hint">cron (5 fields) or <span class="mono">interval:</span>minutes</p>
+        <div class="schedule-preview" id="schedule-preview" aria-live="polite">
+          <span class="muted small" id="schedule-human">checking…</span>
+          <ol id="schedule-next"></ol>
+        </div>
       </div>
       <div>
         <label for="f-venv">Venv (python tasks)</label>
@@ -107,4 +111,43 @@ document.getElementById('add-task').addEventListener('click', () => {
   row.querySelector('input[type=checkbox]').checked = false;
   grid.appendChild(row);
 });
+
+(() => {
+  const input = document.getElementById('f-schedule');
+  const human = document.getElementById('schedule-human');
+  const next = document.getElementById('schedule-next');
+  const endpoint = <?= json_encode(url('/dags/schedule-preview')) ?>;
+  let timer = null;
+
+  const render = async () => {
+    const value = input.value.trim();
+    if (value === '') {
+      human.textContent = 'Enter a schedule to see the next runs.';
+      next.innerHTML = '';
+      return;
+    }
+    try {
+      const res = await fetch(endpoint + '?schedule=' + encodeURIComponent(value),
+        {headers: {'Accept': 'application/json'}});
+      const data = await res.json();
+      if (!data.ok) {
+        human.textContent = data.error || 'invalid schedule';
+        human.classList.add('err');
+        next.innerHTML = '';
+        return;
+      }
+      human.classList.remove('err');
+      human.textContent = data.human;
+      next.innerHTML = (data.next || []).map(t => '<li class="mono">' + t + '</li>').join('');
+    } catch (e) {
+      human.textContent = 'preview unavailable';
+    }
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(render, 350);
+  });
+  render();
+})();
 </script>

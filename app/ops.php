@@ -14,6 +14,10 @@
  *   php app/ops.php venv:check [--name=NAME]
  *   php app/ops.php venv:list [--name=NAME]
  *   php app/ops.php venv:install --name=NAME pkg[==ver] ...
+ *   php app/ops.php venv:upgrade --name=NAME
+ *   php app/ops.php venv:requirements --name=NAME --file=requirements.txt
+ *   php app/ops.php venv:create --name=NAME --path=/path/to/venv [--python=python3]
+ *   php app/ops.php venv:delete --name=NAME
  */
 declare(strict_types=1);
 
@@ -79,6 +83,14 @@ function dispatch(string $cmd, array $opts, array $pos): int
             return cmdVenvInstall($opts, $pos);
         case 'venv:uninstall':
             return cmdVenvUninstall($opts, $pos);
+        case 'venv:upgrade':
+            return cmdVenvUpgrade($opts);
+        case 'venv:requirements':
+            return cmdVenvRequirements($opts);
+        case 'venv:create':
+            return cmdVenvCreate($opts);
+        case 'venv:delete':
+            return cmdVenvDelete($opts);
         case 'prune':
             return cmdPrune($opts);
         default:
@@ -105,7 +117,11 @@ pipnix ops
   venv:list [--name=NAME]           installed packages from the DB
   venv:install --name=NAME pkg[==ver] ...
   venv:uninstall --name=NAME pkg
-  prune --days=30 [--dry-run]       drop finished runs + their logs older
+  venv:upgrade --name=NAME          pip install --upgrade for outdated packages
+  venv:requirements --name=NAME --file=FILE
+  venv:create --name=NAME --path=DIR [--python=BIN]
+  venv:delete --name=NAME           remove the registration (files stay)
+  prune [--days=N] [--dry-run]       drop finished runs + their logs older
                                     than N days (audit rows are kept)
 TXT;
 }
@@ -417,11 +433,150 @@ function cmdVenvUninstall(array $opts, array $pos): int
     return $rc === 0 ? 0 : 1;
 }
 
+/** Upgrade every package pip reports as outdated. */
+function cmdVenvUpgrade(array $opts): int
+{
+    $name = (string) ($opts['name'] ?? '');
+    $venv = Db::one('SELECT * FROM pn_venv WHERE name = ?', [$name]);
+    if (!$venv) {
+        fwrite(STDERR, "unknown venv '{$name}'\n");
+        return 1;
+    }
+    $path = rtrim((string) $venv['path'], '/');
+    $py = is_file($path . '/bin/python') ? $path . '/bin/python' : $path . '/bin/python3';
+    if (!is_file($py)) {
+        fwrite(STDERR, "interpreter missing at {$py}\n");
+        return 1;
+    }
+
+    [$rc, $out, $err] = runCapture([$py, '-m', 'pip', 'list', '--outdated', '--format=json',
+        '--disable-pip-version-check']);
+    if ($rc !== 0) {
+        fwrite(STDERR, "pip list --outdated failed: " . trim($err . ' ' . $out) . "\n");
+        return 1;
+    }
+    $outdated = json_decode($out, true);
+    if (!is_array($outdated) || $outdated === []) {
+        echo "all packages in '{$name}' are up to date\n";
+        return 0;
+    }
+    $names = array_map(static fn (array $p): string => (string) $p['name'], $outdated);
+    echo 'outdated: ' . implode(', ', $names) . "\n";
+    $cmd = array_merge([$py, '-m', 'pip', 'install', '--upgrade'], $names);
+    echo '$ ' . implode(' ', array_map('escapeshellarg', $cmd)) . "\n";
+    $rc = procRunPassthrough($cmd);
+    echo "pip exited with {$rc}\n";
+    if ($rc === 0) {
+        cmdVenvCheck(['name' => $name]);
+    }
+    return $rc === 0 ? 0 : 1;
+}
+
+function cmdVenvRequirements(array $opts): int
+{
+    $name = (string) ($opts['name'] ?? '');
+    $file = (string) ($opts['file'] ?? '');
+    $venv = Db::one('SELECT * FROM pn_venv WHERE name = ?', [$name]);
+    if (!$venv) {
+        fwrite(STDERR, "unknown venv '{$name}'\n");
+        return 1;
+    }
+    if (!is_file($file)) {
+        fwrite(STDERR, "requirements file not found: {$file}\n");
+        return 1;
+    }
+    $path = rtrim((string) $venv['path'], '/');
+    $py = is_file($path . '/bin/python') ? $path . '/bin/python' : $path . '/bin/python3';
+    $cmd = [$py, '-m', 'pip', 'install', '-r', $file];
+    echo '$ ' . implode(' ', array_map('escapeshellarg', $cmd)) . "\n";
+    $rc = procRunPassthrough($cmd);
+    echo "pip exited with {$rc}\n";
+    if ($rc === 0) {
+        cmdVenvCheck(['name' => $name]);
+    }
+    return $rc === 0 ? 0 : 1;
+}
+
+function cmdVenvCreate(array $opts): int
+{
+    $name = (string) ($opts['name'] ?? '');
+    $path = rtrim((string) ($opts['path'] ?? ''), '/');
+    if (!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/', $name)) {
+        fwrite(STDERR, "usage: venv:create --name=NAME --path=DIR [--python=BIN]\n");
+        return 64;
+    }
+    if ($path === '' || $path[0] !== '/' || str_contains($path, '..') || $path === '/') {
+        fwrite(STDERR, "path must be an absolute directory\n");
+        return 64;
+    }
+    if (Db::one('SELECT id FROM pn_venv WHERE name = ?', [$name])) {
+        fwrite(STDERR, "venv '{$name}' is already registered\n");
+        return 1;
+    }
+    if (is_dir($path) && count((array) scandir($path)) > 2) {
+        fwrite(STDERR, "{$path} already exists and is not empty\n");
+        return 1;
+    }
+    if (file_exists($path) && !is_dir($path)) {
+        fwrite(STDERR, "{$path} exists and is not a directory\n");
+        return 1;
+    }
+
+    $python = (string) ($opts['python'] ?? Env::cfg('python_bin', 'python3'));
+    echo "$ " . implode(' ', array_map('escapeshellarg', [$python, '-m', 'venv', $path])) . "\n";
+    [$rc, $out, $err] = runCapture([$python, '-m', 'venv', $path]);
+    if ($out !== '') {
+        echo $out;
+    }
+    if ($rc !== 0) {
+        fwrite(STDERR, "venv creation failed: " . trim($err . ' ' . $out) . "\n");
+        return 1;
+    }
+    if (!is_file($path . '/bin/python3') && !is_file($path . '/bin/python')) {
+        fwrite(STDERR, "venv created without an interpreter at {$path}/bin\n");
+        return 1;
+    }
+
+    $hasDefault = (int) (Db::one('SELECT COUNT(*) AS n FROM pn_venv WHERE is_default = 1')['n'] ?? 0);
+    Db::run(
+        'INSERT INTO pn_venv (name, path, is_default, status, created_at, updated_at)
+         VALUES (?,?,?,?,?,?)',
+        [$name, $path, $hasDefault === 0 ? 1 : 0, 'healthy', Env::now(), Env::now()]
+    );
+    echo "venv: {$name} → {$path}" . ($hasDefault === 0 ? ' (default)' : '') . "\n";
+    cmdVenvCheck(['name' => $name]);
+    return 0;
+}
+
+function cmdVenvDelete(array $opts): int
+{
+    $name = (string) ($opts['name'] ?? '');
+    $venv = Db::one('SELECT * FROM pn_venv WHERE name = ?', [$name]);
+    if (!$venv) {
+        fwrite(STDERR, "unknown venv '{$name}'\n");
+        return 1;
+    }
+    $id = (int) $venv['id'];
+    $refs = Db::one(
+        'SELECT (SELECT COUNT(*) FROM pn_dag WHERE default_venv_id = ?) +
+                (SELECT COUNT(*) FROM pn_task WHERE venv_id = ?) AS n',
+        [$id, $id]
+    );
+    if ((int) ($refs['n'] ?? 0) > 0) {
+        fwrite(STDERR, "refusing to remove '{$name}': still used by "
+            . (int) $refs['n'] . " dag/task reference(s)\n");
+        return 1;
+    }
+    Db::run('DELETE FROM pn_venv WHERE id = ?', [$id]);
+    echo "venv '{$name}' unregistered (files at {$venv['path']} were left in place)\n";
+    return 0;
+}
+
 function cmdPrune(array $opts): int
 {
-    $days = (int) ($opts['days'] ?? 30);
+    $days = (int) ($opts['days'] ?? Settings::int('retention.days', 30));
     if ($days < 1) {
-        fwrite(STDERR, "usage: prune --days=30 [--dry-run]\n");
+        fwrite(STDERR, "usage: prune [--days=30] [--dry-run]\n");
         return 64;
     }
     $dry = isset($opts['dry-run']);

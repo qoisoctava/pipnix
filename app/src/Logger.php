@@ -18,6 +18,20 @@ final class Logger
             . $slug($task) . '__a' . $attempt . '.log';
     }
 
+    /** @return array<int,string> attempt number → path, for one task in a run */
+    public static function attemptsFor(string $dag, string $runId, string $task): array
+    {
+        $out = [];
+        for ($attempt = 1; $attempt <= 50; $attempt++) {
+            $path = self::pathFor($dag, $runId, $task, $attempt);
+            if (!is_file($path)) {
+                continue;
+            }
+            $out[$attempt] = $path;
+        }
+        return $out;
+    }
+
     public static function line(string $path, string $line): void
     {
         $ts = date('Y-m-d H:i:s');

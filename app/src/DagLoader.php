@@ -212,6 +212,14 @@ final class DagLoader
             return ['error' => 'no tasks defined'];
         }
 
+        // Global defaults from the Settings page; a task key always wins.
+        $defaults = [
+            'retries'          => max(0, min(10, Settings::int('task.retries', (int) Env::cfg('task_defaults.retries', 0)))),
+            'retry_delay'      => max(0, min(86400, Settings::int('task.retry_delay', (int) Env::cfg('task_defaults.retry_delay', 300)))),
+            'timeout'          => max(0, min(86400, Settings::int('task.timeout', (int) Env::cfg('task_defaults.timeout', 0)))),
+            'email_on_failure' => Settings::bool('task.email', (bool) Env::cfg('task_defaults.email_on_failure', false)) ? 1 : 0,
+        ];
+
         $tasks = [];
         foreach ($tasksIn as $t) {
             if (!is_array($t)) {
@@ -252,10 +260,10 @@ final class DagLoader
                 'command'          => $cmd,
                 'venv_id'          => $tVenvId,
                 'depends_on'       => array_values(array_unique(array_map('strtolower', $deps))),
-                'retries'          => max(0, min(10, (int) ($t['retries'] ?? 0))),
-                'retry_delay'      => max(0, min(86400, (int) ($t['retry_delay'] ?? 300))),
-                'timeout'          => max(0, min(86400, (int) ($t['timeout'] ?? 0))),
-                'email_on_failure' => !empty($t['email_on_failure']) ? 1 : 0,
+                'retries'          => max(0, min(10, (int) ($t['retries'] ?? $defaults['retries']))),
+                'retry_delay'      => max(0, min(86400, (int) ($t['retry_delay'] ?? $defaults['retry_delay']))),
+                'timeout'          => max(0, min(86400, (int) ($t['timeout'] ?? $defaults['timeout']))),
+                'email_on_failure' => !empty($t['email_on_failure'] ?? $defaults['email_on_failure']) ? 1 : 0,
             ];
         }
 

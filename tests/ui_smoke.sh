@@ -156,6 +156,18 @@ grep -q "Run history" <<<"$DAG" || fail "dag detail missing run history"
 grep -q "step_one\|ui_demo.step_one" <<<"$DAG" || fail "dag detail missing task func"
 ok "dag detail + grid"
 
+for TAB in graph gantt code; do
+  TAB_HTML=$(get "/dags/ui_flow?tab=$TAB")
+  case "$TAB" in
+    graph) grep -q "Dependency graph" <<<"$TAB_HTML" || fail "graph tab missing" ;;
+    gantt) grep -q "Timeline" <<<"$TAB_HTML" || fail "gantt tab missing" ;;
+    code)  grep -q "DAG = {" <<<"$TAB_HTML" || fail "code tab missing" ;;
+  esac
+done
+SRC=$(get /dags/ui_flow/source)
+grep -q "DAG = {" <<<"$SRC" || fail "dag source download missing"
+ok "dag tabs + source download"
+
 RUNS=$(get /runs)
 grep -q "ui_flow" <<<"$RUNS" || fail "runs list empty"
 RUN_ID=$(sed -n 's#.*href="/runs/\([0-9]*\)".*#\1#p' <<<"$RUNS" | head -1)
@@ -167,7 +179,13 @@ ok "runs list + run detail (#$RUN_ID)"
 TASK_ID=$(mysql -N -B -e "SELECT id FROM \`$DB\`.pn_task_run ORDER BY id LIMIT 1;")
 LOG=$(get "/logs/$TASK_ID")
 grep -q "Log" <<<"$LOG" || fail "log page missing"
-ok "log viewer"
+TASKPAGE=$(get "/task/$TASK_ID")
+grep -q "Resolved command" <<<"$TASKPAGE" || fail "task page missing"
+ATTEMPT=$(get "/task/$TASK_ID/attempt/1")
+grep -q "Log" <<<"$ATTEMPT" || fail "attempt log page missing"
+DL=$(get "/logs/$TASK_ID/download")
+grep -q "pipnix:" <<<"$DL" || fail "log download missing"
+ok "log viewer + task page + download"
 
 LOGIDX=$(get /logs)
 grep -q "Task runs" <<<"$LOGIDX" || fail "logs index page missing"
@@ -192,6 +210,10 @@ ADMIN=$(get /admin)
 grep -q "Administrator\|admin" <<<"$ADMIN" || fail "admin page missing users"
 grep -q "Settings" <<<"$ADMIN" || fail "admin page missing settings card"
 ok "admin (admin role)"
+
+SETTINGS=$(get /admin/settings)
+grep -q "Global task defaults\|Retention" <<<"$SETTINGS" || fail "settings page missing"
+ok "settings page"
 
 AUDIT=$(get /admin/audit)
 grep -q "Audit log" <<<"$AUDIT" || fail "audit page missing"

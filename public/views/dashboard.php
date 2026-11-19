@@ -40,7 +40,7 @@ $slotPct = $slots['total'] > 0 ? min(100, (int) round($slots['used'] / $slots['t
 </section>
 
 <section class="block">
-  <h2 class="section">★ First 10 favorite Dags</h2>
+  <h2 class="section">★ Favorite Dags</h2>
   <?php if ($favorites): ?>
     <div class="tags">
       <?php foreach ($favorites as $fav): ?>
@@ -81,8 +81,10 @@ $slotPct = $slots['total'] > 0 ? min(100, (int) round($slots['used'] / $slots['t
 <section class="block">
   <h2 class="section">History</h2>
   <div class="chips">
-    <span class="chip">Last 24 Hours ▾</span>
-    <span class="muted small"><?= e(date('Y-m-d H:i', time() - 86400)) ?>  -  <?= e(date('Y-m-d H:i')) ?></span>
+    <?php foreach (['24h' => 'Last 24 Hours', '7d' => 'Last 7 Days', '30d' => 'Last 30 Days'] as $key => $label): ?>
+      <a class="chip <?= $range === $key ? 'on' : '' ?>" href="<?= url('/?range=' . $key) ?>"><?= e($label) ?></a>
+    <?php endforeach; ?>
+    <span class="muted small"><?= e($rangeSince) ?>  -  <?= e(date('Y-m-d H:i')) ?></span>
   </div>
 </section>
 

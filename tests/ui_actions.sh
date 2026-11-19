@@ -13,6 +13,7 @@ MYSQL_USER="${PN_MYSQL_USER:-root}"
 MYSQL_PASS="${PN_MYSQL_PASS:-}"
 DB="pipnix_act"
 VENV="/tmp/pn_act_venv"
+VENV_EXTRA="/tmp/pn_act_extra_venv"
 KEEP=0
 [[ "${1:-}" == "--keep" ]] && KEEP=1
 
@@ -37,10 +38,10 @@ JAR2=/tmp/pn_act_cookies2.txt
 cleanup() {
   [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true
   if [[ $KEEP -eq 0 ]]; then
-    rm -f app/config.php dags/act_flow.py dags/act_fail.py dags/imported_flow.py jobs/act_demo.py
+    rm -f app/config.php dags/act_flow.py dags/act_fail.py dags/imported_flow.py dags/def_flow.py jobs/act_demo.py
     rm -rf dags/__pycache__ jobs/__pycache__ storage/imports storage/backups
     mysql -e "DROP DATABASE IF EXISTS \`$DB\`;" >/dev/null 2>&1 || true
-    rm -rf "$VENV" "$JAR" "$JAR2" /tmp/act_import.py
+    rm -rf "$VENV" "$VENV_EXTRA" "$JAR" "$JAR2" /tmp/act_import.py /tmp/pn_act_requirements.txt
   fi
 }
 trap cleanup EXIT
@@ -217,7 +218,91 @@ done
 [[ "$GONE" == "1" ]] || fail "six not uninstalled"
 ok "venv:uninstall six"
 
-say "10. users + roles"
+
+say "10. favorites, DAG tabs, task + log pages"
+post /dags/act_flow/star -d "_csrf=$TOKEN" -d "from=list" >/dev/null
+FAV=$(mysql -N -B -e "SELECT is_favorite FROM \`$DB\`.pn_dag WHERE name='act_flow';")
+[[ "$FAV" == "1" ]] || fail "star did not persist"
+HOME_FAV=$(curl -s -b "$JAR" "$BASE/")
+grep -q "Favorite Dags" <<<"$HOME_FAV" || fail "dashboard favorites section missing"
+grep -q 'href="/dags/act_flow"' <<<"$HOME_FAV" || fail "starred dag not on the dashboard"
+
+GRAPH=$(curl -s -b "$JAR" "$BASE/dags/act_flow?tab=graph")
+grep -q "Dependency graph" <<<"$GRAPH" || fail "graph tab missing"
+GANTT=$(curl -s -b "$JAR" "$BASE/dags/act_flow?tab=gantt")
+grep -q "Timeline" <<<"$GANTT" || fail "gantt tab missing"
+CODE=$(curl -s -b "$JAR" "$BASE/dags/act_flow?tab=code")
+grep -q "DAG = {" <<<"$CODE" || fail "code tab missing source"
+SRC=$(curl -s -b "$JAR" "$BASE/dags/act_flow/source")
+grep -q "DAG = {" <<<"$SRC" || fail "source download missing"
+
+TR_ID=$(mysql -N -B -e "SELECT tr.id FROM \`$DB\`.pn_task_run tr JOIN \`$DB\`.pn_task t ON t.id=tr.task_id JOIN \`$DB\`.pn_dag_run r ON r.id=tr.dag_run_id JOIN \`$DB\`.pn_dag d ON d.id=r.dag_id WHERE d.name='act_flow' ORDER BY tr.id DESC LIMIT 1;")
+TASK_HTML=$(curl -s -b "$JAR" "$BASE/task/$TR_ID")
+grep -q "Resolved command" <<<"$TASK_HTML" || fail "task page missing"
+grep -q "Attempts" <<<"$TASK_HTML" || fail "task attempts missing"
+ATTEMPT=$(curl -s -b "$JAR" "$BASE/task/$TR_ID/attempt/1")
+grep -q "pipnix: start" <<<"$ATTEMPT" || fail "attempt log page missing"
+DL_BODY=$(curl -s -b "$JAR" "$BASE/logs/$TR_ID/download")
+grep -q "pipnix: start" <<<"$DL_BODY" || fail "log download missing"
+
+PREV=$(curl -s -b "$JAR" --get --data-urlencode "schedule=0 3 * * *" "$BASE/dags/schedule-preview")
+grep -q '"human":"daily at 03:00"' <<<"$PREV" || fail "schedule preview human text missing"
+grep -q '"next":\[' <<<"$PREV" || fail "schedule preview next runs missing"
+PREVI=$(curl -s -b "$JAR" --get --data-urlencode "schedule=interval:15" "$BASE/dags/schedule-preview")
+grep -q '"human":"every 15 min"' <<<"$PREVI" || fail "interval preview missing"
+ok "favorites, graph/gantt/code tabs, task page, downloads, schedule preview"
+
+say "11. settings apply to DAG defaults"
+post /admin/settings -d "_csrf=$TOKEN" \
+  -d "alerts_from=pipnix@example.com" -d "alerts_to=ops@example.com, oncall@example.com" \
+  -d "retention_days=45" -d "task_retries=2" -d "task_retry_delay=90" \
+  -d "task_timeout=30" -d "task_email=1" >/dev/null
+[[ "$(mysql -N -B -e "SELECT v FROM \`$DB\`.pn_setting WHERE k='task.retries';")" == "2" ]] || fail "task.retries not saved"
+[[ "$(mysql -N -B -e "SELECT v FROM \`$DB\`.pn_setting WHERE k='retention.days';")" == "45" ]] || fail "retention not saved"
+[[ "$(mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_dag WHERE source_hash IS NOT NULL;")" == "0" ]] || fail "dag cache was not invalidated"
+
+cat > dags/def_flow.py <<'PY'
+DAG = {
+    "name": "def_flow",
+    "schedule": "interval:30",
+    "tasks": [{"name": "plain", "command": "echo default"}],
+}
+PY
+php app/ops.php tick >/dev/null
+DEF=$(mysql -N -B -e "SELECT CONCAT(retries,',',retry_delay,',',timeout,',',email_on_failure) FROM \`$DB\`.pn_task t JOIN \`$DB\`.pn_dag d ON d.id=t.dag_id WHERE d.name='def_flow';")
+[[ "$DEF" == "2,90,30,1" ]] || fail "global task defaults not applied ($DEF)"
+
+SETTINGS_HTML=$(curl -s -b "$JAR" "$BASE/admin/settings")
+grep -q 'value="45"' <<<"$SETTINGS_HTML" || fail "settings page missing retention"
+PURGE=$(post /admin/settings/purge -d "_csrf=$TOKEN" -d "days=3650")
+grep -q "Purge finished" <<<"$PURGE" || fail "purge did not report success"
+ok "settings saved, DAG cache invalidated, defaults 2/90/30/1 applied, purge works"
+
+say "12. venv lifecycle and delete guard"
+post /python/create -d "_csrf=$TOKEN" -d "name=extra" -d "path=$VENV_EXTRA" \
+  -d "python=$(command -v python3)" >/dev/null
+mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_venv WHERE name='extra';" | grep -q 1 || fail "venv create did not register"
+[[ -x "$VENV_EXTRA/bin/python" ]] || fail "venv create did not make a venv"
+
+post /python/extra/delete -d "_csrf=$TOKEN" >/dev/null
+mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_venv WHERE name='extra';" | grep -q 0 || fail "venv delete did not remove the registration"
+
+post /python/reporting/delete -d "_csrf=$TOKEN" >/dev/null
+mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_venv WHERE name='reporting';" | grep -q 1 || fail "referenced venv was deleted"
+
+: > /tmp/pn_act_requirements.txt
+curl -s -L -b "$JAR" -c "$JAR" -F "_csrf=$TOKEN" \
+  -F "requirements=@/tmp/pn_act_requirements.txt;type=text/plain" \
+  "$BASE/python/reporting/requirements" >/dev/null
+REQ_OK=0
+for _ in $(seq 1 40); do
+  if grep -q "pip exited with 0" logs/venv-reporting.log 2>/dev/null; then REQ_OK=1; break; fi
+  sleep 1
+done
+[[ "$REQ_OK" == "1" ]] || fail "requirements install did not finish"
+ok "venv create/delete, reference guard, requirements upload"
+
+say "13. users + roles"
 post /admin/users/new -d "_csrf=$TOKEN" -d "username=viewer1" -d "email=v@example.com" -d "password=viewpass1" -d "role=viewer" >/dev/null
 mysql -N -B -e "SELECT COUNT(*) FROM \`$DB\`.pn_user WHERE username='viewer1';" | grep -q 1 || fail "viewer1 not created"
 LOGIN2=$(curl -s -c "$JAR2" "$BASE/login")
@@ -229,7 +314,7 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR2" -d "_csrf=$T2" "$BASE/d
 [[ "$CODE" == "403" ]] || fail "viewer should get 403 on trigger ($CODE)"
 ok "viewer role enforced (403 on admin + trigger)"
 
-say "11. audit"
+say "14. audit"
 AUDIT=$(curl -s -b "$JAR" "$BASE/admin/audit")
 grep -q "dag.imported" <<<"$AUDIT" || fail "audit missing dag.imported"
 grep -q "task.marked_success" <<<"$AUDIT" || fail "audit missing mark_success"

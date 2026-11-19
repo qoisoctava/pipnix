@@ -417,3 +417,87 @@ td.err { color: #F87171; white-space: pre-wrap; }
   .content { padding: 20px; }
   .cols-3 { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- favorites */
+.btn.star-on { color: #FBBF24; border-color: #4A3A12; background: #2A230F; }
+.btn.star-on:hover { color: #FDE68A; }
+
+/* ---------------------------------------------------------------- DAG graph */
+.graph-wrap { overflow-x: auto; padding: 4px; }
+.dag-graph { display: block; }
+.gnode rect { fill: var(--card); stroke: var(--idle); stroke-width: 2; }
+.gnode.ok rect { stroke: var(--ok); }
+.gnode.bad rect { stroke: var(--bad); }
+.gnode.run rect { stroke: var(--run); }
+.gnode.warn rect { stroke: var(--warn); }
+.gnode.skip rect { stroke: var(--skip); }
+.gnode text { fill: var(--text); font: 600 12px var(--sans); }
+.gnode .gstate { fill: var(--muted); font: 11px var(--mono); }
+.gedge { stroke: #39414F; stroke-width: 1.5; fill: none; }
+
+/* ---------------------------------------------------------------- Gantt */
+.gantt { display: flex; flex-direction: column; gap: 8px; }
+.gantt-row { display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: center; }
+.gantt-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.gantt-track { position: relative; height: 24px; background: #20252E; border-radius: 6px; overflow: hidden; }
+.gantt-bar {
+  position: absolute; top: 0; height: 24px; border-radius: 6px;
+  background: var(--idle); color: #0B0E12;
+  font: 11px var(--mono); display: flex; align-items: center; justify-content: center;
+}
+.gantt-bar.ok { background: var(--ok); }
+.gantt-bar.bad { background: var(--bad); }
+.gantt-bar.run { background: var(--run); }
+.gantt-bar.warn { background: var(--warn); }
+.gantt-bar.skip { background: var(--skip); }
+.gantt-bar.none { background: #20252E; color: var(--muted); justify-content: flex-start; padding-left: 8px; }
+
+/* ---------------------------------------------------------------- code view */
+.code-view {
+  background: var(--input); border: 1px solid var(--border); border-radius: 8px;
+  max-height: 620px; overflow: auto;
+}
+.code-view table { border-collapse: collapse; width: 100%; }
+.code-view td {
+  vertical-align: top; font-family: var(--mono); font-size: 12px; line-height: 1.55;
+  padding: 0 10px; white-space: pre;
+}
+.code-view td.ln {
+  color: var(--muted); text-align: right; user-select: none;
+  border-right: 1px solid var(--border); width: 48px; padding-right: 8px;
+}
+.code-view td.cl { color: var(--text); }
+
+/* ---------------------------------------------------------------- logs */
+.log-tools { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+.log-tools input[type=search] {
+  height: 32px; padding: 0 10px; border-radius: 8px; background: var(--input);
+  border: 1px solid var(--border); color: var(--text); font: inherit;
+}
+.log-tools input[type=search]:focus { border-color: var(--link); outline: 0; }
+.log-line.hit { background: #14312E; }
+
+/* ---------------------------------------------------------------- task detail */
+.resolved {
+  background: var(--input); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; font-family: var(--mono); font-size: 12px;
+  white-space: pre-wrap; overflow-wrap: anywhere; margin: 0;
+}
+.resolved.err { color: #FCA5A5; }
+.kv-row.vertical { flex-direction: column; gap: 12px; }
+.kv-row.vertical > div { flex-direction: row; justify-content: space-between; gap: 12px; }
+
+/* ---------------------------------------------------------------- schedule preview */
+.schedule-preview {
+  margin-top: 8px; padding: 10px 12px; background: var(--input);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.schedule-preview ol { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.schedule-preview li { font-size: 11px; }
+.schedule-preview .err { color: #F87171; }
+
+/* selects inside tables (role picker) */
+.table select {
+  height: 26px; padding: 0 6px; border-radius: 6px; background: var(--input);
+  border: 1px solid var(--border); color: var(--text); font: inherit; font-size: 12px;
+}

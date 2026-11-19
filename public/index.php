@@ -94,11 +94,32 @@ switch ($page) {
             dag_import_page();
             return;
         }
+        if ($segments[1] === 'schedule-preview') {
+            dag_schedule_preview();
+            return;
+        }
+        if (($segments[2] ?? '') === 'source') {
+            dag_source((string) $segments[1]);
+            return;
+        }
         if (($segments[2] ?? '') === 'edit') {
             dag_edit_page((string) $segments[1]);
             return;
         }
         dag_page((string) $segments[1]);
+        return;
+    case 'task':
+        if (ctype_digit((string) ($segments[1] ?? ''))) {
+            if (($segments[2] ?? '') === 'attempt' && ctype_digit((string) ($segments[3] ?? ''))) {
+                attempt_log_page((int) $segments[1], (int) $segments[3]);
+                return;
+            }
+            task_page((int) $segments[1]);
+            return;
+        }
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Task not found',
+            'message' => 'No task instance with that id.'], 'bare');
         return;
     case 'runs':
         if (!isset($segments[1])) {
@@ -108,6 +129,12 @@ switch ($page) {
         run_page((int) $segments[1]);
         return;
     case 'logs':
+        if (($segments[2] ?? '') === 'download' && isset($segments[1])) {
+            $attempt = isset($_GET['attempt']) && ctype_digit((string) $_GET['attempt'])
+                ? (int) $_GET['attempt'] : null;
+            log_download((int) $segments[1], $attempt);
+            return;
+        }
         logs_page(isset($segments[1]) ? (int) $segments[1] : (isset($_GET['task']) ? (int) $_GET['task'] : 0));
         return;
     case 'docs':
@@ -133,6 +160,10 @@ switch ($page) {
         require_role('admin');
         if (($segments[1] ?? '') === 'audit') {
             audit_page();
+            return;
+        }
+        if (($segments[1] ?? '') === 'settings') {
+            settings_page();
             return;
         }
         admin_page();
@@ -186,6 +217,17 @@ function handle_login(): void
 // ================================================================== dashboard
 function dashboard_page(): void
 {
+    $ranges = [
+        '24h' => ['Last 24 Hours', 86400],
+        '7d'  => ['Last 7 Days', 604800],
+        '30d' => ['Last 30 Days', 2592000],
+    ];
+    $range = (string) ($_GET['range'] ?? '24h');
+    if (!isset($ranges[$range])) {
+        $range = '24h';
+    }
+    $since = date('Y-m-d H:i:s', time() - $ranges[$range][1]);
+
     $stats = [
         'failed_dags' => (int) (Db::one(
             'SELECT COUNT(*) AS n FROM pn_dag d WHERE (
@@ -198,17 +240,16 @@ function dashboard_page(): void
     ];
 
     $dagRunMix = [];
-    foreach (Db::all("SELECT state, COUNT(*) n FROM pn_dag_run
-                       WHERE started_at >= (NOW() - INTERVAL 1 DAY)
-                       GROUP BY state") as $row) {
+    foreach (Db::all('SELECT state, COUNT(*) n FROM pn_dag_run
+                       WHERE started_at >= ? GROUP BY state', [$since]) as $row) {
         $dagRunMix[$row['state']] = (int) $row['n'];
     }
     $taskMix = [];
-    foreach (Db::all("SELECT tr.state, COUNT(*) n
+    foreach (Db::all('SELECT tr.state, COUNT(*) n
                         FROM pn_task_run tr
                         JOIN pn_dag_run r ON r.id = tr.dag_run_id
-                       WHERE r.started_at >= (NOW() - INTERVAL 1 DAY)
-                       GROUP BY tr.state") as $row) {
+                       WHERE r.started_at >= ?
+                       GROUP BY tr.state', [$since]) as $row) {
         $taskMix[$row['state']] = (int) $row['n'];
     }
 
@@ -241,7 +282,7 @@ function dashboard_page(): void
     );
 
     $favorites = Db::all(
-        'SELECT d.name FROM pn_dag d ORDER BY d.updated_at DESC LIMIT 10'
+        'SELECT name FROM pn_dag WHERE is_favorite = 1 ORDER BY name LIMIT 10'
     );
 
     render('dashboard', [
@@ -255,6 +296,9 @@ function dashboard_page(): void
         'lastTick' => $lastTick,
         'failures' => $failures,
         'favorites' => $favorites,
+        'range' => $range,
+        'rangeLabel' => $ranges[$range][0],
+        'rangeSince' => $since,
     ]);
 }
 
@@ -310,6 +354,41 @@ function dag_page(string $name): void
     $venv = $dag['default_venv_id']
         ? Db::one('SELECT name FROM pn_venv WHERE id = ?', [$dag['default_venv_id']]) : null;
 
+    $tab = (string) ($_GET['tab'] ?? 'grid');
+    if (!in_array($tab, ['grid', 'graph', 'gantt', 'code'], true)) {
+        $tab = 'grid';
+    }
+
+    // Latest run + its task states drive the Graph and Gantt tabs.
+    $latest = $runs[0] ?? null;
+    $latestTasks = [];
+    if ($latest && $tab !== 'code') {
+        $latestTasks = Db::all(
+            'SELECT tr.state, tr.started_at, tr.finished_at, tr.attempt, tr.exit_code,
+                    tr.error, tr.result_json, tr.log_path, t.id AS task_id, t.name
+               FROM pn_task_run tr JOIN pn_task t ON t.id = tr.task_id
+              WHERE tr.dag_run_id = ? ORDER BY t.id',
+            [(int) $latest['id']]
+        );
+    }
+    $graph = $tab === 'graph' ? dag_graph_layout($tasks, $latestTasks) : [];
+
+    $source = null;
+    if ($tab === 'code') {
+        $path = (string) $dag['source_path'];
+        $root = realpath(Env::path('dags'));
+        $real = realpath($path);
+        if ($root !== false && $real !== false && str_starts_with($real, $root . DIRECTORY_SEPARATOR)
+            && is_file($real) && filesize($real) <= 1048576) {
+            $source = [
+                'path' => $real,
+                'name' => basename($real),
+                'size' => (int) filesize($real),
+                'lines' => preg_split('/\R/', (string) file_get_contents($real)) ?: [],
+            ];
+        }
+    }
+
     render('dag', [
         'title' => $dag['name'],
         'nav' => 'dags',
@@ -318,6 +397,219 @@ function dag_page(string $name): void
         'runs' => $runs,
         'grid' => $grid,
         'venvName' => $venv['name'] ?? null,
+        'tab' => $tab,
+        'latest' => $latest,
+        'latestTasks' => $latestTasks,
+        'graph' => $graph,
+        'source' => $source,
+    ]);
+}
+
+/** Layered DAG layout: longest path from a root decides the column. */
+function dag_graph_layout(array $tasks, array $latestTasks): array
+{
+    $byName = [];
+    foreach ($tasks as $t) {
+        $byName[$t['name']] = [
+            'id' => (int) $t['id'],
+            'deps' => array_values(array_filter(array_map('trim',
+                explode(',', (string) $t['depends_on'])))),
+            'state' => 'idle',
+            'duration' => '—',
+            'attempt' => 1,
+        ];
+    }
+    foreach ($latestTasks as $tr) {
+        $key = (string) $tr['name'];
+        if (!isset($byName[$key])) {
+            continue;
+        }
+        $byName[$key]['state'] = (string) $tr['state'];
+        $byName[$key]['attempt'] = (int) $tr['attempt'];
+        if ($tr['started_at']) {
+            $byName[$key]['duration'] = human_duration((string) $tr['started_at'],
+                $tr['finished_at'] !== null ? (string) $tr['finished_at'] : null);
+        }
+    }
+
+    $level = [];
+    $resolve = function (string $n, array $seen = []) use (&$resolve, &$level, $byName): int {
+        if (isset($level[$n])) {
+            return $level[$n];
+        }
+        if (isset($seen[$n])) {
+            return 0;
+        }
+        $seen[$n] = true;
+        $max = -1;
+        foreach ($byName[$n]['deps'] ?? [] as $dep) {
+            if (isset($byName[$dep])) {
+                $max = max($max, $resolve($dep, $seen));
+            }
+        }
+        return $level[$n] = $max + 1;
+    };
+    foreach (array_keys($byName) as $n) {
+        $resolve($n);
+    }
+
+    $perLevel = [];
+    foreach ($byName as $n => $info) {
+        $info['name'] = $n;
+        $perLevel[$level[$n]][] = $info;
+    }
+    ksort($perLevel);
+
+    return [
+        'levels' => $perLevel,
+        'nodes' => $byName,
+        'cols' => $perLevel === [] ? 0 : max(array_keys($perLevel)) + 1,
+        'rows' => $perLevel === [] ? 0 : max(array_map('count', $perLevel)),
+    ];
+}
+
+/** JSON preview for the DAG editor: human sentence + the next 5 runs. */
+function dag_schedule_preview(): void
+{
+    $raw = trim((string) ($_GET['schedule'] ?? ''));
+    header('Content-Type: application/json; charset=utf-8');
+
+    if ($raw === '') {
+        echo json_encode(['ok' => false, 'error' => 'Enter a cron expression or interval:N']);
+        return;
+    }
+    if (str_starts_with($raw, 'interval:')) {
+        $minutes = (int) substr($raw, 9);
+        if ($minutes < 1) {
+            echo json_encode(['ok' => false, 'error' => 'interval must be >= 1 minute']);
+            return;
+        }
+        $next = [];
+        $t = time();
+        for ($i = 0; $i < 5; $i++) {
+            $t += $minutes * 60;
+            $next[] = date('Y-m-d H:i', $t);
+        }
+        echo json_encode([
+            'ok' => true, 'kind' => 'interval',
+            'human' => 'every ' . $minutes . ' min', 'next' => $next,
+        ]);
+        return;
+    }
+    if (!Cron::isValid($raw)) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid cron expression (5 fields: min hour dom mon dow)']);
+        return;
+    }
+    $next = [];
+    $t = new DateTimeImmutable('now');
+    for ($i = 0; $i < 5; $i++) {
+        $n = Cron::nextRun($raw, $t);
+        if (!$n) {
+            break;
+        }
+        $next[] = $n->format('Y-m-d H:i');
+        $t = $n;
+    }
+    echo json_encode([
+        'ok' => true, 'kind' => 'cron', 'human' => cron_human($raw), 'next' => $next,
+    ]);
+}
+
+/** Download the DAG module exactly as it is stored in dags/. */
+function dag_source(string $name): void
+{
+    $dag = Db::one('SELECT source_path FROM pn_dag WHERE name = ?', [$name]);
+    if (!$dag) {
+        http_response_code(404);
+        exit('not found');
+    }
+    $root = realpath(Env::path('dags'));
+    $real = realpath((string) $dag['source_path']);
+    if ($root === false || $real === false || !str_starts_with($real, $root . DIRECTORY_SEPARATOR)
+        || !is_file($real)) {
+        http_response_code(404);
+        exit('source missing');
+    }
+    header('Content-Type: text/x-python; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . basename($real) . '"');
+    header('Content-Length: ' . filesize($real));
+    readfile($real);
+    exit;
+}
+
+// ================================================================== task instance
+function task_page(int $id): void
+{
+    $tr = Db::one(
+        'SELECT tr.*, t.name AS task_name, t.func, t.command, t.runner, t.timeout,
+                t.retries, t.retry_delay, t.depends_on, t.email_on_failure,
+                v.name AS venv_name,
+                r.run_id, r.state AS run_state, r.started_at AS run_started,
+                d.name AS dag_name, d.id AS dag_id
+           FROM pn_task_run tr
+           JOIN pn_task t     ON t.id = tr.task_id
+           JOIN pn_dag_run r  ON r.id = tr.dag_run_id
+           JOIN pn_dag d      ON d.id = r.dag_id
+           LEFT JOIN pn_venv v ON v.id = t.venv_id
+          WHERE tr.id = ?', [$id]);
+    if (!$tr) {
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Task not found',
+            'message' => 'No task instance with id ' . $id . '.'], 'bare');
+        return;
+    }
+
+    $attempts = Logger::attemptsFor((string) $tr['dag_name'], (string) $tr['run_id'],
+        (string) $tr['task_name']);
+    $resolved = $tr['func']
+        ? $tr['func'] . '(ds="' . $tr['run_id'] . '")'
+        : str_replace('{ds}', (string) $tr['run_id'], (string) $tr['command']);
+    $tail = [];
+    if (!empty($tr['log_path']) && is_file((string) $tr['log_path'])) {
+        $tail = tail_lines((string) $tr['log_path'], 30);
+    }
+
+    render('task', [
+        'title' => $tr['task_name'] . ' · ' . $tr['state'],
+        'nav' => 'runs',
+        'tr' => $tr,
+        'attempts' => $attempts,
+        'resolved' => $resolved,
+        'tail' => $tail,
+    ]);
+}
+
+/** Reuse the logs viewer for one stored attempt file. */
+function attempt_log_page(int $id, int $attempt): void
+{
+    $tr = Db::one(
+        'SELECT tr.*, t.name AS task_name, d.name AS dag_name, r.run_id
+           FROM pn_task_run tr
+           JOIN pn_task t    ON t.id = tr.task_id
+           JOIN pn_dag_run r ON r.id = tr.dag_run_id
+           JOIN pn_dag d     ON d.id = r.dag_id
+          WHERE tr.id = ?', [$id]);
+    if (!$tr) {
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Log not found',
+            'message' => 'No task instance with id ' . $id . '.'], 'bare');
+        return;
+    }
+    $path = Logger::pathFor((string) $tr['dag_name'], (string) $tr['run_id'],
+        (string) $tr['task_name'], $attempt);
+    if (!is_file($path)) {
+        http_response_code(404);
+        render('error', ['code' => 404, 'title' => 'Log not found',
+            'message' => 'Attempt ' . $attempt . ' has no log file.'], 'bare');
+        return;
+    }
+    render('logs', [
+        'title' => 'Logs · a' . $attempt,
+        'nav' => 'runs',
+        'tr' => $tr,
+        'lines' => tail_lines($path, 500),
+        'attempt' => $attempt,
+        'logPath' => $path,
     ]);
 }
 
@@ -378,6 +670,37 @@ function run_page(int $id): void
 }
 
 // ================================================================== logs
+function log_download(int $taskRunId, ?int $attempt = null): void
+{
+    $tr = Db::one(
+        'SELECT tr.log_path, t.name AS task_name, d.name AS dag_name, r.run_id
+           FROM pn_task_run tr
+           JOIN pn_task t    ON t.id = tr.task_id
+           JOIN pn_dag_run r ON r.id = tr.dag_run_id
+           JOIN pn_dag d     ON d.id = r.dag_id
+          WHERE tr.id = ?', [$taskRunId]);
+    if (!$tr) {
+        http_response_code(404);
+        exit('log not found');
+    }
+    $path = $attempt !== null
+        ? Logger::pathFor((string) $tr['dag_name'], (string) $tr['run_id'],
+            (string) $tr['task_name'], $attempt)
+        : (string) ($tr['log_path'] ?? '');
+    $root = realpath(Env::logs());
+    $real = $path !== '' ? realpath($path) : false;
+    if ($root === false || $real === false
+        || !str_starts_with($real, $root . DIRECTORY_SEPARATOR) || !is_file($real)) {
+        http_response_code(404);
+        exit('log not found');
+    }
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . basename($real) . '"');
+    header('Content-Length: ' . filesize($real));
+    readfile($real);
+    exit;
+}
+
 function logs_page(int $taskRunId): void
 {
     if ($taskRunId === 0) {
@@ -503,14 +826,29 @@ function python_page(?string $name): void
 // ================================================================== account
 function account_password_page(): void
 {
+    $profile = Db::one(
+        'SELECT username, email, role, must_change_password, last_login_at, created_at
+           FROM pn_user WHERE id = ?',
+        [(int) (current_user()['id'] ?? 0)]
+    ) ?: current_user();
     render('account_password', [
         'title' => 'Change password',
         'nav'   => '',
-        'user'  => current_user(),
+        'user'  => $profile,
+        'profile' => $profile,
     ]);
 }
 
 // ================================================================== admin
+function settings_page(): void
+{
+    render('settings', [
+        'title' => 'Settings',
+        'nav' => 'admin',
+        'values' => Settings::effective(),
+    ]);
+}
+
 function admin_page(): void
 {
     $users = Db::all('SELECT * FROM pn_user ORDER BY id');

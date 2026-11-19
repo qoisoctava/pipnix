@@ -53,3 +53,17 @@ $forced = (int) ($user['must_change_password'] ?? 0) === 1;
     </div>
   </form>
 </section>
+
+<section class="card" style="max-width:520px;margin-top:16px">
+  <div class="card-head"><h3>Profile</h3><span class="chip"><?= e((string) ($user['role'] ?? '')) ?></span></div>
+  <div class="kv-row">
+    <div><span class="label">User</span><span class="mono"><?= e((string) ($user['username'] ?? '')) ?></span></div>
+    <div><span class="label">Email</span><span class="mono"><?= e((string) ($user['email'] ?? '—')) ?></span></div>
+    <div><span class="label">Last login</span><span class="mono"><?= e((string) ($user['last_login_at'] ?? 'never')) ?></span></div>
+    <div><span class="label">Member since</span><span class="mono"><?= e((string) ($user['created_at'] ?? '—')) ?></span></div>
+  </div>
+  <form method="post" action="<?= url('/logout') ?>" style="margin-top:14px">
+    <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+    <button class="btn" type="submit">⏻ Sign out</button>
+  </form>
+</section>

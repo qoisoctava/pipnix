@@ -17,7 +17,7 @@ date_default_timezone_set((string) ($GLOBALS['pn_config']['timezone'] ?? 'UTC'))
 
 foreach (['Env', 'Db', 'Lock', 'Cron', 'Logger', 'Alerter', 'Audit',
           'DagWriter', 'DagLoader', 'Scheduler', 'Runner', 'TaskOps',
-          'PasswordPolicy'] as $class) {
+          'PasswordPolicy', 'Settings'] as $class) {
     $file = PN_SRC . '/' . $class . '.php';
     if (!is_file($file)) {
         fwrite(STDERR, "pipnix: missing class file {$file}\n");

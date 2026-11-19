@@ -12,20 +12,20 @@ final class Alerter
         if ((int) ($taskRun['alerted'] ?? 0) === 1) {
             return;
         }
-        $enabled = (bool) Env::cfg('alerts.enabled', false);
+        $enabled = Settings::bool('alerts.enabled', (bool) Env::cfg('alerts.enabled', false));
         if (!$enabled || (int) ($task['email_on_failure'] ?? 0) !== 1) {
             return;
         }
 
         $to = (string) ($dag['email'] ?? '');
         if ($to === '') {
-            $to = implode(',', (array) Env::cfg('alerts.to', []));
+            $to = (string) Settings::get('alerts.to', implode(',', (array) Env::cfg('alerts.to', [])));
         }
         if ($to === '') {
             return;
         }
 
-        $from    = (string) Env::cfg('alerts.from', 'pipnix@localhost');
+        $from = (string) Settings::get('alerts.from', (string) Env::cfg('alerts.from', 'pipnix@localhost'));
         $subject = sprintf('[pipnix] %s / %s failed', $dag['name'], $task['name']);
         $body    = "Dag:    {$dag['name']}\n"
                  . "Task:   {$task['name']}\n"

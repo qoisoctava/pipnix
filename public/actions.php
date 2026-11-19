@@ -38,6 +38,8 @@ function handle_post(string $page, array $segments): void
             post_dag_pause($sub, false);
         } elseif ($verb === 'resume') {
             post_dag_pause($sub, true);
+        } elseif ($verb === 'star') {
+            post_dag_star($sub);
         }
         return;
     }
@@ -57,6 +59,10 @@ function handle_post(string $page, array $segments): void
             post_venv_new();
             return;
         }
+        if ($sub === 'create') {
+            post_venv_create();
+            return;
+        }
         $verb = $segments[2] ?? '';
         if ($verb === 'check') {
             post_venv_check($sub);
@@ -64,6 +70,12 @@ function handle_post(string $page, array $segments): void
             post_venv_install($sub);
         } elseif ($verb === 'uninstall') {
             post_venv_uninstall($sub);
+        } elseif ($verb === 'upgrade') {
+            post_venv_upgrade($sub);
+        } elseif ($verb === 'requirements') {
+            post_venv_requirements($sub);
+        } elseif ($verb === 'delete') {
+            post_venv_delete($sub);
         }
         return;
     }
@@ -77,7 +89,17 @@ function handle_post(string $page, array $segments): void
                 post_user_toggle((int) $verb);
             } elseif ($what === 'password') {
                 post_user_password((int) $verb);
+            } elseif ($what === 'role') {
+                post_user_role((int) $verb);
             }
+        }
+        return;
+    }
+    if ($page === 'admin' && ($segments[1] ?? '') === 'settings') {
+        if (($segments[2] ?? '') === 'purge') {
+            post_settings_purge();
+        } else {
+            post_settings_save();
         }
         return;
     }
@@ -335,6 +357,23 @@ function post_dag_pause(string $name, bool $resume): void
     redirect('/dags/' . rawurlencode($name));
 }
 
+function post_dag_star(string $name): void
+{
+    csrf_check();
+    $dag = Db::one('SELECT id, is_favorite FROM pn_dag WHERE name = ?', [$name]);
+    if (!$dag) {
+        flash('No such Dag.', 'bad');
+        redirect('/dags');
+    }
+    $new = (int) $dag['is_favorite'] === 1 ? 0 : 1;
+    Db::run('UPDATE pn_dag SET is_favorite = ? WHERE id = ?', [$new, $dag['id']]);
+    audit($new === 1 ? 'dag.starred' : 'dag.unstarred', $name);
+    flash($new === 1 ? "Dag '{$name}' pinned to the dashboard." : "Dag '{$name}' unpinned.");
+    redirect(($_POST['from'] ?? '') === 'list'
+        ? '/dags'
+        : '/dags/' . rawurlencode($name));
+}
+
 // ================================================================== tasks
 
 function post_task_clear(int $id): void
@@ -544,8 +583,106 @@ function post_venv_uninstall(string $name): void
     redirect('/python/' . rawurlencode($name) . '/log');
 }
 
-// ================================================================== users
+function post_venv_upgrade(string $name): void
+{
+    require_role('admin');
+    csrf_check();
+    if (!Db::one('SELECT id FROM pn_venv WHERE name = ?', [$name])) {
+        flash('No such environment.', 'bad');
+        redirect('/python');
+    }
+    @unlink(venv_log_path($name));
+    spawn_ops(['venv:upgrade', '--name=' . $name], venv_log_path($name));
+    audit('venv.upgrade.started', $name);
+    flash('Upgrade started — outdated packages are installed with pip --upgrade.');
+    redirect('/python/' . rawurlencode($name) . '/log');
+}
 
+function post_venv_requirements(string $name): void
+{
+    require_role('admin');
+    csrf_check();
+    if (!Db::one('SELECT id FROM pn_venv WHERE name = ?', [$name])) {
+        flash('No such environment.', 'bad');
+        redirect('/python');
+    }
+    $file = $_FILES['requirements'] ?? null;
+    if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        flash('Choose a requirements.txt file.', 'bad');
+        redirect('/python/' . rawurlencode($name));
+    }
+    if ((int) $file['size'] > 262144) {
+        flash('requirements.txt is too large (max 256 KB).', 'bad');
+        redirect('/python/' . rawurlencode($name));
+    }
+    if (strtolower((string) pathinfo((string) $file['name'], PATHINFO_EXTENSION)) !== 'txt') {
+        flash('Only .txt requirement files are accepted.', 'bad');
+        redirect('/python/' . rawurlencode($name));
+    }
+    $dir = Env::path('storage/imports');
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $target = $dir . '/requirements-' . slug($name) . '-' . date('Ymd-His') . '.txt';
+    if (!move_uploaded_file((string) $file['tmp_name'], $target)) {
+        flash('Upload failed (permissions?).', 'bad');
+        redirect('/python/' . rawurlencode($name));
+    }
+    @unlink(venv_log_path($name));
+    spawn_ops(['venv:requirements', '--name=' . $name, '--file=' . $target], venv_log_path($name));
+    audit('venv.requirements.started', $name . ' ← ' . (string) $file['name']);
+    flash('Requirements install started — this can take a few minutes.');
+    redirect('/python/' . rawurlencode($name) . '/log');
+}
+
+function post_venv_create(): void
+{
+    require_role('admin');
+    csrf_check();
+    $name = slug((string) ($_POST['name'] ?? ''));
+    $path = rtrim(trim((string) ($_POST['path'] ?? '')), '/');
+    $python = trim((string) ($_POST['python'] ?? '')) ?: (string) Env::cfg('python_bin', 'python3');
+
+    if (!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/', $name)) {
+        flash('Invalid environment name.', 'bad');
+        redirect('/python');
+    }
+    if ($path === '' || $path[0] !== '/' || str_contains($path, '..') || $path === '/') {
+        flash('Path must be an absolute directory (e.g. /home/USER/venvs/reporting).', 'bad');
+        redirect('/python');
+    }
+    if (is_dir($path) && count((array) scandir($path)) > 2) {
+        flash('That directory already exists and is not empty — register it instead.', 'bad');
+        redirect('/python');
+    }
+
+    [$rc, $out] = run_ops_sync(['venv:create', '--name=' . $name, '--path=' . $path,
+        '--python=' . $python], 120);
+    $lines = array_values(array_filter(explode("\n", trim($out))));
+    $summary = $lines ? end($lines) : 'no output';
+    audit('venv.created', $name . ' ' . $path);
+    flash($rc === 0 ? ('Environment created: ' . $summary) : ('Create failed: ' . $summary),
+        $rc === 0 ? 'ok' : 'bad');
+    redirect($rc === 0 ? '/python/' . rawurlencode($name) : '/python');
+}
+
+function post_venv_delete(string $name): void
+{
+    require_role('admin');
+    csrf_check();
+    if (!Db::one('SELECT id FROM pn_venv WHERE name = ?', [$name])) {
+        flash('No such environment.', 'bad');
+        redirect('/python');
+    }
+    [$rc, $out] = run_ops_sync(['venv:delete', '--name=' . $name], 60);
+    $lines = array_values(array_filter(explode("\n", trim($out))));
+    $summary = $lines ? end($lines) : 'no output';
+    audit('venv.deleted', $name);
+    flash($rc === 0 ? $summary : ('Not removed: ' . $summary), $rc === 0 ? 'ok' : 'bad');
+    redirect('/python');
+}
+
+// ================================================================== users
 function post_user_new(): void
 {
     require_role('admin');
@@ -606,6 +743,38 @@ function post_user_toggle(int $id): void
     Db::run('UPDATE pn_user SET is_active = ? WHERE id = ?', [$active, $id]);
     audit($active ? 'user.enabled' : 'user.disabled', (string) $user['username']);
     flash($active ? 'User enabled.' : 'User disabled.');
+    redirect('/admin');
+}
+
+function post_user_role(int $id): void
+{
+    require_role('admin');
+    csrf_check();
+    $user = Db::one('SELECT * FROM pn_user WHERE id = ?', [$id]);
+    if (!$user) {
+        flash('No such user.', 'bad');
+        redirect('/admin');
+    }
+    $role = (string) ($_POST['role'] ?? '');
+    if (!in_array($role, ['admin', 'operator', 'viewer'], true)) {
+        flash('Unknown role.', 'bad');
+        redirect('/admin');
+    }
+    if ($id === (int) (current_user()['id'] ?? 0)) {
+        flash('You cannot change your own role.', 'bad');
+        redirect('/admin');
+    }
+    if ($user['role'] === 'admin' && $role !== 'admin') {
+        $admins = (int) (Db::one(
+            "SELECT COUNT(*) AS n FROM pn_user WHERE role = 'admin' AND is_active = 1")['n'] ?? 0);
+        if ($admins <= 1) {
+            flash('The last active admin cannot be demoted.', 'bad');
+            redirect('/admin');
+        }
+    }
+    Db::run('UPDATE pn_user SET role = ? WHERE id = ?', [$role, $id]);
+    audit('user.role', (string) $user['username'] . ' → ' . $role);
+    flash("Role for '{$user['username']}' is now {$role}.");
     redirect('/admin');
 }
 
@@ -678,6 +847,73 @@ function post_account_password(): void
     audit('user.password_changed', (string) $row['username']);
     flash('Password updated.');
     redirect('/');
+}
+
+// ================================================================== settings
+
+function post_settings_save(): void
+{
+    require_role('admin');
+    csrf_check();
+
+    $from = trim((string) ($_POST['alerts_from'] ?? ''));
+    if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        flash('Alert sender must be a valid email address.', 'bad');
+        redirect('/admin/settings');
+    }
+    $rawTo = trim((string) ($_POST['alerts_to'] ?? ''));
+    $to = array_values(array_filter(array_map('trim', preg_split('/[,;]/', $rawTo) ?: [])));
+    foreach ($to as $addr) {
+        if (!filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+            flash("Recipient '{$addr}' is not a valid email address.", 'bad');
+            redirect('/admin/settings');
+        }
+    }
+
+    $retention = max(1, min(3650, (int) ($_POST['retention_days'] ?? 30)));
+    $retries   = max(0, min(10, (int) ($_POST['task_retries'] ?? 0)));
+    $delay     = max(0, min(86400, (int) ($_POST['task_retry_delay'] ?? 300)));
+    $timeout   = max(0, min(86400, (int) ($_POST['task_timeout'] ?? 0)));
+
+    $before = Settings::effective();
+    Settings::set('alerts.enabled', !empty($_POST['alerts_enabled']) ? '1' : '0');
+    Settings::set('alerts.from', $from);
+    Settings::set('alerts.to', implode(',', $to));
+    Settings::set('retention.days', (string) $retention);
+    Settings::set('task.retries', (string) $retries);
+    Settings::set('task.retry_delay', (string) $delay);
+    Settings::set('task.timeout', (string) $timeout);
+    Settings::set('task.email', !empty($_POST['task_email']) ? '1' : '0');
+
+    $defaultsChanged = $before['task.retries'] !== $retries
+        || $before['task.retry_delay'] !== $delay
+        || $before['task.timeout'] !== $timeout
+        || $before['task.email'] !== !empty($_POST['task_email']);
+    if ($defaultsChanged) {
+        // The loader caches by source hash: invalidate it so the new defaults
+        // reach DAGs whose Python source did not change.
+        Db::run('UPDATE pn_dag SET source_hash = NULL');
+    }
+
+    audit('settings.changed', 'panel');
+    flash('Settings saved.' . ($defaultsChanged
+        ? ' Task defaults apply to every DAG on the next tick.'
+        : ''));
+    redirect('/admin/settings');
+}
+
+function post_settings_purge(): void
+{
+    require_role('admin');
+    csrf_check();
+    $days = max(1, min(3650, (int) ($_POST['days'] ?? Settings::int('retention.days', 30))));
+    [$rc, $out] = run_ops_sync(['prune', '--days=' . $days], 120);
+    $lines = array_values(array_filter(explode("\n", trim($out))));
+    $summary = $lines ? implode(' · ', array_slice($lines, 1, 3)) : ($rc === 0 ? 'nothing to prune' : 'failed');
+    audit('settings.purged', 'days=' . $days);
+    flash($rc === 0 ? ('Purge finished: ' . $summary) : ('Purge failed: ' . $summary),
+        $rc === 0 ? 'ok' : 'bad');
+    redirect('/admin/settings');
 }
 
 // ================================================================== pages

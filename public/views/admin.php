@@ -2,6 +2,7 @@
 <header class="page-head">
   <h1>Admin</h1>
   <div class="toolbar">
+    <a class="btn" href="<?= url('/admin/settings') ?>">Settings</a>
     <a class="btn" href="<?= url('/admin/audit') ?>">Audit log</a>
     <a class="btn" href="<?= url('/python') ?>">Environments</a>
   </div>
@@ -29,6 +30,17 @@
             <input name="password" type="password" placeholder="new password" size="12" minlength="8" required>
             <button class="btn btn-sm" type="submit">Set</button>
           </form>
+          <?php if ((int) $u['id'] !== (int) ($user['id'] ?? 0)): ?>
+            <form class="inline" method="post" action="<?= url('/admin/users/' . (int) $u['id'] . '/role') ?>">
+              <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+              <select name="role" aria-label="Role for <?= e($u['username']) ?>">
+                <?php foreach (['viewer', 'operator', 'admin'] as $roleOption): ?>
+                  <option value="<?= $roleOption ?>" <?= $u['role'] === $roleOption ? 'selected' : '' ?>><?= $roleOption ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button class="btn btn-sm" type="submit">Role</button>
+            </form>
+          <?php endif; ?>
         </td>
       </tr>
     <?php endforeach; ?>

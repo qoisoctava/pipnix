@@ -50,6 +50,15 @@ if ((int) ($has['n'] ?? 0) === 0) {
     echo "migration: pn_user.must_change_password\n";
 }
 
+$has = Db::one(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pn_dag'
+        AND COLUMN_NAME = 'is_favorite'");
+if ((int) ($has['n'] ?? 0) === 0) {
+    Db::run('ALTER TABLE pn_dag ADD COLUMN is_favorite TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active');
+    echo "migration: pn_dag.is_favorite\n";
+}
+
 if ($venv !== null) {
     [$name, $path] = array_pad(explode(':', $venv, 2), 2, '');
     if ($name !== '' && $path !== '') {

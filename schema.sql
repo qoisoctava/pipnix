@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS pn_dag (
   schedule_type    ENUM('cron','interval') NOT NULL DEFAULT 'cron',
   schedule         VARCHAR(128) NOT NULL,
   is_active        TINYINT(1)   NOT NULL DEFAULT 1,
+  is_favorite      TINYINT(1)   NOT NULL DEFAULT 0,
   max_concurrency  TINYINT UNSIGNED NOT NULL DEFAULT 1,
   default_venv_id  INT UNSIGNED NULL,
   source_path      VARCHAR(255) NOT NULL,
@@ -124,4 +125,11 @@ CREATE TABLE IF NOT EXISTS pn_user (
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,
   last_login_at DATETIME     NULL,
   created_at    DATETIME     NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------------- settings
+CREATE TABLE IF NOT EXISTS pn_setting (
+  k          VARCHAR(64) NOT NULL PRIMARY KEY,
+  v          TEXT        NOT NULL,
+  updated_at DATETIME    NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

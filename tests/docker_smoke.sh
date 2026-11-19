@@ -51,7 +51,7 @@ dc() { docker compose -p "$PROJECT" "$@"; }
 say "1. build and start a fresh stack"
 rm -f "$DAG_FILE"
 dc up -d --build >/dev/null
-for _ in $(seq 1 90); do
+for _ in $(seq 1 150); do
   dc logs app 2>/dev/null | grep -q 'starting Apache' && break
   sleep 2
 done

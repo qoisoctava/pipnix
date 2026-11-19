@@ -26,7 +26,7 @@
     <tbody>
     <?php foreach ($tasks as $t): ?>
       <tr class="<?= $t['state'] === 'failed' ? 'row-fail' : '' ?>">
-        <td class="mono"><?= e($t['task_name']) ?></td>
+        <td class="mono"><a class="link" href="<?= url('/task/' . (int) $t['id']) ?>"><?= e($t['task_name']) ?></a></td>
         <td><span class="badge <?= state_class($t['state']) ?>"><?= e(state_label($t['state'])) ?></span></td>
         <td class="mono small"><?= (int) $t['attempt'] ?></td>
         <td class="mono small"><?= e($t['started_at'] ?? '—') ?></td>

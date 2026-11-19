@@ -33,6 +33,14 @@
             <?php if ($dag['last_state']): ?>
               <span class="badge <?= state_class($dag['last_state']) ?>"><?= e(state_label($dag['last_state'])) ?></span>
             <?php endif; ?>
+            <form class="inline" method="post" action="<?= url('/dags/' . rawurlencode($dag['name']) . '/star') ?>">
+              <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+              <input type="hidden" name="from" value="list">
+              <button class="btn btn-sm <?= (int) ($dag['is_favorite'] ?? 0) === 1 ? 'star-on' : '' ?>" type="submit"
+                      title="<?= (int) ($dag['is_favorite'] ?? 0) === 1 ? 'Remove from favorites' : 'Pin to the dashboard' ?>">
+                <?= (int) ($dag['is_favorite'] ?? 0) === 1 ? '★' : '☆' ?>
+              </button>
+            </form>
             <?php if (can('trigger')): ?>
               <form class="inline" method="post" action="<?= url('/dags/' . rawurlencode($dag['name']) . '/trigger') ?>">
                 <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">

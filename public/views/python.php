@@ -46,6 +46,31 @@ $statusClass = static fn (string $s): string => match ($s) {
       </div>
     </form>
   </section>
+
+  <section class="card">
+    <div class="card-head"><h3>Create environment</h3>
+      <span class="muted small">runs <span class="mono">python3 -m venv</span> on the server</span></div>
+    <form method="post" action="<?= url('/python/create') ?>" class="form-grid">
+      <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+      <div>
+        <label for="c-name">Name</label>
+        <input id="c-name" name="name" placeholder="reporting" pattern="[a-z0-9][a-z0-9_-]{1,31}" required>
+      </div>
+      <div>
+        <label for="c-path">Directory</label>
+        <input id="c-path" name="path" class="mono" placeholder="/home/USER/venvs/reporting" required>
+      </div>
+      <div>
+        <label for="c-python">Interpreter</label>
+        <input id="c-python" name="python" class="mono" value="<?= e((string) Env::cfg('python_bin', 'python3')) ?>">
+        <p class="hint">binary used to create the venv</p>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" type="submit">Create</button>
+      </div>
+    </form>
+  </section>
   <?php endif; ?>
   <div class="stack">
     <?php foreach ($venvs as $v): ?>
@@ -56,7 +81,16 @@ $statusClass = static fn (string $s): string => match ($s) {
             <?php if ((int) $v['is_default'] === 1): ?><span class="badge primary">default</span><?php endif; ?>
             <span class="badge <?= $statusClass($v['status']) ?>"><?= e(state_label($v['status'])) ?></span>
           </div>
-          <span class="muted small"><?= (int) $v['packages'] ?> packages · <?= (int) $v['outdated'] ?> outdated</span>
+          <div class="toolbar">
+            <span class="muted small"><?= (int) $v['packages'] ?> packages · <?= (int) $v['outdated'] ?> outdated</span>
+            <?php if (can('venv')): ?>
+              <form class="inline" method="post" action="<?= url('/python/' . rawurlencode($v['name']) . '/delete') ?>"
+                    onsubmit="return confirm('Unregister <?= e($v['name']) ?>? Files on disk are kept.')">
+                <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+                <button class="btn btn-sm" type="submit" title="Unregister (refused while DAGs use it)">⌫</button>
+              </form>
+            <?php endif; ?>
+          </div>
         </div>
         <div class="cols-3">
           <div><span class="label">Directory</span><span class="mono small"><?= e($v['path']) ?></span></div>
@@ -85,6 +119,17 @@ $statusClass = static fn (string $s): string => match ($s) {
           <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
           <input name="spec" class="mono" placeholder="package==1.2.3" size="22" required>
           <button class="btn btn-primary" type="submit">Install</button>
+        </form>
+        <form class="inline" method="post" action="<?= url('/python/' . rawurlencode($selected['name']) . '/upgrade') ?>"
+              onsubmit="return confirm('Upgrade every outdated package in <?= e($selected['name']) ?>?')">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="btn" type="submit">↥ Upgrade all</button>
+        </form>
+        <form class="inline" method="post" enctype="multipart/form-data"
+              action="<?= url('/python/' . rawurlencode($selected['name']) . '/requirements') ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <label class="check"><input type="file" name="requirements" accept=".txt" required> requirements.txt</label>
+          <button class="btn" type="submit">Install file</button>
         </form>
         <?php if (is_file(venv_log_path($selected['name']))): ?>
           <a class="btn" href="<?= url('/python/' . rawurlencode($selected['name']) . '/log') ?>">pip log</a>
@@ -126,4 +171,4 @@ $statusClass = static fn (string $s): string => match ($s) {
   </section>
 <?php endif; ?>
 
-<p class="muted small">Package management (install / upgrade / requirements.txt) arrives with the action screens; for now use <code class="mono">php app/ops.php venv:install</code>.</p>
+<p class="muted small">Installs, upgrades and requirements files stream into the pip log (refreshed automatically). The same actions exist on the CLI: <code class="mono">php app/ops.php venv:install|upgrade|requirements</code>.</p>
