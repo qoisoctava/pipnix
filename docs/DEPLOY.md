@@ -130,6 +130,8 @@ That first line *is* the scheduler daemon. Nothing else runs continuously.
 | Heartbeat stale, runs never start | Cron line wrong PHP path, or cron disabled by hosting — test the command manually in Terminal |
 | `unknown venv` when triggering a DAG | Register the venv (Python page) and run **Check now**; the DAG's `venv` name must match |
 | `runner did not report` on every task | `proc_open`/`nohup` blocked by the host — ask support to allow it, or run tasks via `php app/ops.php tick` |
+| Web buttons hang and end with `timed out after 60s` (venv create/check/delete, pip install) | The domain runs PHP-FPM, so `PHP_BINARY` is `php-fpm` and spawning it never returns. Set `'php_bin' => '/opt/cpanel/ea-php82/root/usr/bin/php'` (or `/usr/local/bin/php`) in `app/config.php`; pipnix auto-detects it otherwise |
+| `ensurepip is not available` when creating a venv | `/usr/bin/python3` is 3.6 on cPanel. Set `python_bin` to an absolute alt path, e.g. `/opt/alt/python311/bin/python3.11` |
 | Login works but every form says 419 | Page was open across a session change — reload, then retry |
 | Assets (CSS/logo) 404 | `.htaccess` in `public_html/pipnix/` missing — re-copy it from `public/` |
 | Email alerts never arrive | `alerts.enabled` false, or the task/DAG has no `email_on_failure`; cPanel needs the From address to be a mailbox on your domain |

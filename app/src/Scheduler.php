@@ -299,7 +299,7 @@ final class Scheduler
 
     private static function spawn(int $taskRunId): int
     {
-        $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(PN_APP . '/runner.php')
+        $cmd = escapeshellarg(Env::phpCli()) . ' ' . escapeshellarg(PN_APP . '/runner.php')
             . ' --run=' . $taskRunId;
         $log = escapeshellarg(Env::logs() . '/cron.log');
         $full = 'nohup ' . $cmd . ' >> ' . $log . ' 2>&1 & echo $!';

@@ -38,6 +38,55 @@ final class Env
         return PHP_SAPI === 'cli';
     }
 
+    /**
+     * Absolute path to a PHP **CLI** binary, safe to spawn from the web SAPI.
+     *
+     * PHP_BINARY cannot be trusted under PHP-FPM/CGI: cPanel runs domains on
+     * PHP-FPM, where PHP_BINARY is `…/sbin/php-fpm`, and spawning that makes
+     * the child hang forever (web actions then die with "timed out after 60s").
+     * Resolution order: `php_bin` in config.php → PHP_BINARY when it really is
+     * a CLI binary → well-known cPanel paths (newest EA-PHP first) → "php".
+     */
+    public static function phpCli(): string
+    {
+        $configured = self::cfg('php_bin');
+        if (is_string($configured) && $configured !== '' && self::usableBinary($configured)) {
+            return $configured;
+        }
+
+        $binary = (string) (defined('PHP_BINARY') ? PHP_BINARY : '');
+        if ($binary !== '' && self::usableBinary($binary)) {
+            return $binary;
+        }
+
+        $candidates = [];
+        foreach (['/opt/cpanel/ea-php*/root/usr/bin/php', '/opt/alt/php*/usr/bin/php'] as $pattern) {
+            $found = glob($pattern) ?: [];
+            rsort($found);
+            $candidates = array_merge($candidates, $found);
+        }
+        $candidates[] = (defined('PHP_BINDIR') ? PHP_BINDIR : '/usr/bin') . '/php';
+        $candidates[] = '/usr/local/bin/php';
+        $candidates[] = '/usr/bin/php';
+
+        foreach ($candidates as $candidate) {
+            if (self::usableBinary($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return 'php';
+    }
+
+    /** True for an executable that is php or php<N>, never php-fpm/php-cgi. */
+    private static function usableBinary(string $path): bool
+    {
+        if ($path === '' || !is_file($path) || !is_executable($path)) {
+            return false;
+        }
+        return !preg_match('/php-(fpm|cgi)$/i', basename($path));
+    }
+
     public static function now(): string
     {
         return date('Y-m-d H:i:s');

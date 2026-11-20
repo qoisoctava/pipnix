@@ -677,8 +677,8 @@ final class Updater
     /** @return array{0:int,1:string} */
     private static function migrate(): array
     {
-        $cmd = [PHP_BINARY, PN_APP . '/install.php'];
-        $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $cmd = [Env::phpCli(), PN_APP . '/install.php'];
+        $desc = [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = @proc_open($cmd, $desc, $pipes, PN_BASE);
         if (!is_resource($proc)) {
             return [127, 'cannot start install.php'];

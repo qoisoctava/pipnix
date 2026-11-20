@@ -245,7 +245,7 @@ function slug(string $value): string
 /** Run `php app/ops.php ...` detached, output appended to a log file. @return int pid */
 function spawn_ops(array $args, string $logFile): int
 {
-    $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(PN_APP . '/ops.php');
+    $cmd = escapeshellarg(Env::phpCli()) . ' ' . escapeshellarg(PN_APP . '/ops.php');
     foreach ($args as $arg) {
         $cmd .= ' ' . escapeshellarg((string) $arg);
     }
@@ -257,8 +257,8 @@ function spawn_ops(array $args, string $logFile): int
 /** Run `php app/ops.php ...` synchronously with a deadline. @return array{0:int,1:string} */
 function run_ops_sync(array $args, int $timeout = 90): array
 {
-    $cmd = array_merge([PHP_BINARY, PN_APP . '/ops.php'], $args);
-    $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $cmd = array_merge([Env::phpCli(), PN_APP . '/ops.php'], $args);
+    $desc = [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
     $proc = @proc_open($cmd, $desc, $pipes, PN_BASE);
     if (!is_resource($proc)) {
         return [127, 'cannot start ops'];

@@ -298,6 +298,13 @@ rollback, permission, dan GitHub.
 - `runner did not report`: host mungkin memblokir `proc_open`/proses detached,
   atau timeout terlalu singkat.
 - 419: reload halaman untuk mendapatkan session/CSRF token baru.
+- Tombol web menggantung lalu berakhir `timed out after 60s` (buat/cek/hapus
+  env Python, install paket): domain memakai PHP-FPM sehingga `PHP_BINARY`
+  menunjuk `php-fpm`. Set `'php_bin' => '/opt/cpanel/ea-php82/root/usr/bin/php'`
+  di `app/config.php` (atau biarkan pipnix mendeteksi otomatis).
+- `ensurepip is not available` saat membuat env: `/usr/bin/python3` di cPanel
+  adalah 3.6. Arahkan `python_bin` ke path absolut alt-python, mis.
+  `/opt/alt/python311/bin/python3.11`.
 - Update gagal permission: PHP perlu hak tulis ke direktori kode terkait.
 - Login pertama memakai password lemah? Ganti password sebelum melanjutkan.
 

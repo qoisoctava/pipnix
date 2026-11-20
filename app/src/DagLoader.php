@@ -160,7 +160,7 @@ final class DagLoader
     private static function runPhpLoader(string $path): array
     {
         $code = 'echo json_encode(["ok"=>true,"dag"=>include $argv[1]]);';
-        $cmd  = [PHP_BINARY, '-r', $code, '--', $path];
+        $cmd  = [Env::phpCli(), '-r', $code, '--', $path];
         $out  = @shell_exec(implode(' ', array_map('escapeshellarg', $cmd)) . ' 2>&1');
         $json = json_decode(trim((string) $out), true);
         if (!is_array($json) || empty($json['ok'])) {
