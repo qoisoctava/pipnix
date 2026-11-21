@@ -41,36 +41,53 @@ final class Env
     /**
      * Absolute path to a PHP **CLI** binary, safe to spawn from the web SAPI.
      *
-     * PHP_BINARY cannot be trusted under PHP-FPM/CGI: cPanel runs domains on
-     * PHP-FPM, where PHP_BINARY is `…/sbin/php-fpm`, and spawning that makes
-     * the child hang forever (web actions then die with "timed out after 60s").
-     * Resolution order: `php_bin` in config.php → PHP_BINARY when it really is
-     * a CLI binary → well-known cPanel paths (newest EA-PHP first) → "php".
+     * PHP_BINARY cannot be trusted from the web:
+     *   - PHP-FPM exports its own `php-fpm` binary (spawning it hangs forever),
+     *   - LiteSpeed exports `lsphp`, which is often an old PHP 5.6 build
+     *     (the child then dies with "Unsupported declare 'strict_types'").
+     * So every candidate is probed with `-r 'echo PHP_VERSION;'` and only a
+     * PHP >= 8.1 build is accepted. Order: `php_bin` config → PHP_BINARY →
+     * EA-PHP / alt-php / LiteSpeed paths → "php".
      */
     public static function phpCli(): string
     {
         $configured = self::cfg('php_bin');
-        if (is_string($configured) && $configured !== '' && self::usableBinary($configured)) {
-            return $configured;
-        }
-
-        $binary = (string) (defined('PHP_BINARY') ? PHP_BINARY : '');
-        if ($binary !== '' && self::usableBinary($binary)) {
-            return $binary;
+        if (is_string($configured) && $configured !== '') {
+            // An explicit value wins as long as it is an executable path or a
+            // bare command name resolved through PATH.
+            if (!str_contains($configured, '/') || self::usableBinary($configured)) {
+                return $configured;
+            }
         }
 
         $candidates = [];
-        foreach (['/opt/cpanel/ea-php*/root/usr/bin/php', '/opt/alt/php*/usr/bin/php'] as $pattern) {
-            $found = glob($pattern) ?: [];
-            rsort($found);
-            $candidates = array_merge($candidates, $found);
+        $binary = (string) (defined('PHP_BINARY') ? PHP_BINARY : '');
+        if ($binary !== '') {
+            $candidates[] = $binary;
         }
-        $candidates[] = (defined('PHP_BINDIR') ? PHP_BINDIR : '/usr/bin') . '/php';
-        $candidates[] = '/usr/local/bin/php';
-        $candidates[] = '/usr/bin/php';
 
-        foreach ($candidates as $candidate) {
-            if (self::usableBinary($candidate)) {
+        $patterns = [
+            '/opt/cpanel/ea-php*/root/usr/bin/php',
+            '/opt/cpanel/ea-php*/root/usr/bin/lsphp',
+            '/opt/alt/php*/usr/bin/php',
+            '/usr/local/lsws/lsphp*/bin/lsphp',
+            '/usr/local/bin/php8*',
+            (defined('PHP_BINDIR') ? PHP_BINDIR : '/usr/bin') . '/php',
+            '/usr/local/bin/php',
+            '/usr/bin/php',
+        ];
+        foreach ($patterns as $pattern) {
+            foreach (glob($pattern) ?: [] as $found) {
+                $candidates[] = $found;
+            }
+        }
+
+        foreach (array_unique($candidates) as $candidate) {
+            if (!self::usableBinary($candidate)) {
+                continue;
+            }
+            $version = self::binaryVersion($candidate);
+            if ($version !== null && version_compare($version, '8.1', '>=')) {
                 return $candidate;
             }
         }
@@ -78,13 +95,44 @@ final class Env
         return 'php';
     }
 
-    /** True for an executable that is php or php<N>, never php-fpm/php-cgi. */
+    /** True for an executable that is php/lsphp/php<N>, never php-fpm/php-cgi. */
     private static function usableBinary(string $path): bool
     {
         if ($path === '' || !is_file($path) || !is_executable($path)) {
             return false;
         }
         return !preg_match('/php-(fpm|cgi)$/i', basename($path));
+    }
+
+    /** `PHP_VERSION` of a candidate binary, or null when it cannot be run. */
+    private static function binaryVersion(string $bin): ?string
+    {
+        $cmd = escapeshellarg($bin) . ' -r ' . escapeshellarg('echo PHP_VERSION;') . ' 2>/dev/null';
+        $proc = @proc_open($cmd, [1 => ['pipe', 'w']], $pipes);
+        if (!is_resource($proc)) {
+            return null;
+        }
+        stream_set_blocking($pipes[1], false);
+        $out = '';
+        $deadline = microtime(true) + 2.0;
+        while (true) {
+            $out .= (string) stream_get_contents($pipes[1]);
+            $st = proc_get_status($proc);
+            if (!$st['running']) {
+                break;
+            }
+            if (microtime(true) > $deadline) {
+                @proc_terminate($proc, 9);
+                break;
+            }
+            usleep(20000);
+        }
+        $out .= (string) stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        proc_close($proc);
+
+        $out = trim($out);
+        return preg_match('/^\d+\.\d+\.\d+/', $out, $m) ? $m[0] : null;
     }
 
     public static function now(): string

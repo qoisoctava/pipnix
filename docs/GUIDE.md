@@ -299,9 +299,13 @@ rollback, permission, dan GitHub.
   atau timeout terlalu singkat.
 - 419: reload halaman untuk mendapatkan session/CSRF token baru.
 - Tombol web menggantung lalu berakhir `timed out after 60s` (buat/cek/hapus
-  env Python, install paket): domain memakai PHP-FPM sehingga `PHP_BINARY`
-  menunjuk `php-fpm`. Set `'php_bin' => '/opt/cpanel/ea-php82/root/usr/bin/php'`
-  di `app/config.php` (atau biarkan pipnix mendeteksi otomatis).
+  env Python, install paket): domain memakai PHP-FPM atau LiteSpeed sehingga
+  `PHP_BINARY` menunjuk `php-fpm`/`lsphp`. Set
+  `'php_bin' => '/opt/cpanel/ea-php82/root/usr/bin/php'` di `app/config.php`
+  (pipnix memeriksa kandidat dan hanya menerima PHP >= 8.1).
+- Log pip berisi `Unsupported declare 'strict_types'` atau `parse error,
+  unexpected '?'`: proses yang di-spawn adalah PHP 5.x (`lsphp` lama) — sama
+  seperti kasus di atas, arahkan `php_bin` ke PHP 8.x.
 - `ensurepip is not available` saat membuat env: `/usr/bin/python3` di cPanel
   adalah 3.6. Arahkan `python_bin` ke path absolut alt-python, mis.
   `/opt/alt/python311/bin/python3.11`.

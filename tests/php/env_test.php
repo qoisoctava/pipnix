@@ -32,6 +32,9 @@ check('is not php-cgi', !preg_match('/php-cgi$/i', basename($bin)), $bin);
 $out = trim((string) @shell_exec(escapeshellarg($bin) . ' -r ' . escapeshellarg('echo "cli-ok";') . ' 2>/dev/null'));
 check('actually runs as CLI', $out === 'cli-ok', $out);
 
+$version = trim((string) @shell_exec(escapeshellarg($bin) . ' -r ' . escapeshellarg('echo PHP_VERSION;') . ' 2>/dev/null'));
+check('resolved PHP is >= 8.1 (not a legacy lsphp)', version_compare($version, '8.1', '>='), $version);
+
 // The explicit override must win when it points at a real CLI binary.
 $GLOBALS['pn_config']['php_bin'] = $bin;
 check('config php_bin override is honoured', Env::phpCli() === $bin);
@@ -41,6 +44,5 @@ unset($GLOBALS['pn_config']['php_bin']);
 $GLOBALS['pn_config']['php_bin'] = '/nonexistent/php-fpm';
 check('bogus php_bin falls back to a real CLI', Env::phpCli() !== '/nonexistent/php-fpm');
 unset($GLOBALS['pn_config']['php_bin']);
-
 echo $failures === 0 ? "\nall checks passed\n" : "\n{$failures} check(s) failed\n";
 exit($failures === 0 ? 0 : 1);
